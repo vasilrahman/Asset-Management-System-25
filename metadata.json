@@ -1,0 +1,7 @@
+{
+  "name": "AMS - Asset Management System",
+  "description": "A comprehensive Asset Management System with distinct Admin and Staff modules for tracking, verification, and reporting.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

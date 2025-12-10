@@ -1,0 +1,118 @@
+import { Asset, User, VerificationLog } from './types';
+
+export const INITIAL_USERS: User[] = [
+  {
+    id: 'u1',
+    name: 'Admin User',
+    username: 'admin123',
+    password: 'admin@123',
+    role: 'ADMIN',
+    designation: 'System Administrator',
+    phone: '555-0101',
+    email: 'admin@ams.com',
+    isActive: true,
+    avatarUrl: 'https://picsum.photos/100/100?random=1',
+  },
+  {
+    id: 'u2',
+    name: 'John Staff',
+    username: 'staff123',
+    password: 'staff@123',
+    role: 'STAFF',
+    designation: 'IT Support',
+    phone: '555-0102',
+    email: 'john@ams.com',
+    isActive: true,
+    avatarUrl: 'https://picsum.photos/100/100?random=2',
+  },
+];
+
+export const INITIAL_ASSETS: Asset[] = [
+  { 
+    id: 'AST-001', 
+    name: 'MacBook Pro M2', 
+    category: 'Laptop', 
+    serialNumber: 'MBP2023-001', 
+    status: 'Active', 
+    imageUrl: 'https://picsum.photos/200/200?random=10', 
+    purchaseDate: '2023-01-15', 
+    createdDate: '2023-01-15',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    addedBy: 'Admin User', 
+    isQrGenerated: true, 
+    location: 'HQ - Floor 1', 
+    lastVerifiedDate: new Date().toISOString(), 
+    verifiedBy: 'John Staff',
+    attachments: [] 
+  },
+  { 
+    id: 'AST-002', 
+    name: 'Dell XPS 15', 
+    category: 'Laptop', 
+    serialNumber: 'DXP15-998', 
+    status: 'Active', 
+    imageUrl: 'https://picsum.photos/200/200?random=11', 
+    purchaseDate: '2023-02-10', 
+    createdDate: '2023-02-10',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    addedBy: 'Admin User', 
+    isQrGenerated: true, 
+    location: 'HQ - Floor 2',
+    attachments: []
+  },
+  { 
+    id: 'AST-003', 
+    name: 'Canon EOS R5', 
+    category: 'Camera', 
+    serialNumber: 'CAN-R5-112', 
+    status: 'Maintenance', 
+    imageUrl: 'https://picsum.photos/200/200?random=12', 
+    purchaseDate: '2022-11-05', 
+    createdDate: '2022-11-05',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    addedBy: 'Admin User', 
+    isQrGenerated: false, 
+    location: 'Studio A',
+    attachments: []
+  },
+  { 
+    id: 'AST-004', 
+    name: 'iPad Pro 12.9', 
+    category: 'Tablet', 
+    serialNumber: 'IPD-129-444', 
+    status: 'Active', 
+    imageUrl: 'https://picsum.photos/200/200?random=13', 
+    purchaseDate: '2023-03-20', 
+    createdDate: '2023-03-20',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    addedBy: 'Admin User', 
+    isQrGenerated: true, 
+    location: 'Field',
+    attachments: []
+  },
+  { 
+    id: 'AST-005', 
+    name: 'Sony A7S III', 
+    category: 'Camera', 
+    serialNumber: 'SNY-A7-888', 
+    status: 'Active', 
+    imageUrl: 'https://picsum.photos/200/200?random=14', 
+    purchaseDate: '2023-01-01', 
+    createdDate: '2023-01-01',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    addedBy: 'Admin User', 
+    isQrGenerated: true, 
+    location: 'Studio B',
+    attachments: []
+  },
+];
+
+export const INITIAL_LOGS: VerificationLog[] = [
+  { id: 'L1', assetId: 'AST-001', assetName: 'MacBook Pro M2', verifiedBy: 'John Staff', timestamp: new Date().toISOString() },
+  { id: 'L2', assetId: 'AST-004', assetName: 'iPad Pro 12.9', verifiedBy: 'John Staff', timestamp: new Date(Date.now() - 86400000).toISOString() },
+];
