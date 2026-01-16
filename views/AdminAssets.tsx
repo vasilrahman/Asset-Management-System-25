@@ -1,12 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Search, ArrowRight, Calendar, ChevronDown, Package, Laptop, Camera, Smartphone, Tablet } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
+import { fetchAssets } from '../services/assetService';
+import { Asset } from '../types';
 
 export const AdminAssets = () => {
-  const { assets, navigate } = useApp();
+  const { navigate } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   
   // Filters (Removed QR Status)
   const [filterCategory, setFilterCategory] = useState<string>('All');
@@ -19,28 +22,48 @@ export const AdminAssets = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Filter Logic
-  const filteredAssets = assets.filter(asset => {
-    // Text Search
-    const matchesSearch = 
-        asset.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        asset.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Dropdown Filters
-    const matchesCategory = filterCategory === 'All' || asset.category === filterCategory;
-    const matchesStatus = filterStatus === 'All' || asset.status === filterStatus;
-    
-    // Date Range Filter
-    let matchesDate = true;
-    if (dateStart && asset.createdDate < dateStart) matchesDate = false;
-    if (dateEnd && asset.createdDate > dateEnd) matchesDate = false;
+  // Data
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-    return matchesSearch && matchesCategory && matchesStatus && matchesDate;
-  });
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
-  const currentAssets = filteredAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // Fetch data
+  useEffect(() => {
+    const loadAssets = async () => {
+      setLoading(true);
+      try {
+        const response = await fetchAssets({
+          search: debouncedSearch,
+          category: filterCategory,
+          status: filterStatus,
+          page: currentPage,
+          limit: itemsPerPage,
+        });
+        setAssets(response.data || []);
+        setTotal(response.meta?.total || 0);
+        setTotalPages(response.meta?.totalPages || 0);
+      } catch (error) {
+        console.error('Failed to fetch assets:', error);
+        setAssets([]);
+        setTotal(0);
+        setTotalPages(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAssets();
+  }, [debouncedSearch, filterCategory, filterStatus, currentPage]);
+
+  const currentAssets = assets;
 
   const categoryOptions = [
     { value: 'All', label: 'Category: All' },
@@ -152,7 +175,20 @@ export const AdminAssets = () => {
               <div className="col-span-2 text-right">Actions</div>
           </div>
 
-          {currentAssets.map(asset => (
+          {loading ? (
+              <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700">
+                  <div className="text-lg text-slate-600 dark:text-slate-400">Loading assets...</div>
+              </div>
+          ) : currentAssets.length === 0 ? (
+              <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Search className="text-slate-300 dark:text-slate-500" size={24} />
+                  </div>
+                  <h3 className="text-slate-800 dark:text-slate-200 font-medium">No assets found</h3>
+                  <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Try adjusting your search or filters</p>
+              </div>
+          ) : (
+              currentAssets.map(asset =>
               <div key={asset.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all group flex flex-col md:grid md:grid-cols-12 items-center gap-4">
                   
                   {/* Thumbnail Image */}
@@ -207,16 +243,7 @@ export const AdminAssets = () => {
                       </button>
                   </div>
               </div>
-          ))}
-
-           {currentAssets.length === 0 && (
-              <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
-                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Search className="text-slate-300 dark:text-slate-500" size={24} />
-                  </div>
-                  <h3 className="text-slate-800 dark:text-slate-200 font-medium">No assets found</h3>
-                  <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Try adjusting your search or filters</p>
-              </div>
+              )
           )}
       </div>
         
