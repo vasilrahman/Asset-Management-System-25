@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { useAuth } from './context/AuthContext';
 import { Login } from './views/Login';
 import { AdminDashboard } from './views/AdminDashboard';
 import { AdminAssets } from './views/AdminAssets';
@@ -17,7 +18,8 @@ import { AdminComplaints } from './views/AdminComplaints';
 import { LayoutDashboard, Package, Users, LogOut, Menu, X, Bell, AlertTriangle, User, Moon, Sun, ChevronDown, QrCode, CheckCircle, MessageSquare } from 'lucide-react';
 
 const MainLayout = () => {
-    const { currentUser, logout, currentRoute, navigate, theme, toggleTheme } = useApp();
+    const { currentRoute, navigate, theme, toggleTheme } = useApp();
+    const { isAuthenticated, user, logout: authLogout } = useAuth();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
@@ -25,7 +27,7 @@ const MainLayout = () => {
 
     useEffect(() => {
         setShowLogoutModal(false);
-    }, [currentUser]);
+    }, [user]);
 
     // Click outside to close profile dropdown
     useEffect(() => {
@@ -38,12 +40,12 @@ const MainLayout = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    if (!currentUser) {
+    if (!isAuthenticated) {
         return <Login />;
     }
 
     // --- STAFF VIEW ---
-    if (currentUser.role === 'STAFF') {
+    if (user?.role === 'STAFF') {
         return (
             <div className="bg-slate-50 dark:bg-slate-900 min-h-screen relative font-sans text-slate-900 dark:text-slate-100 transition-colors duration-200">
                 {/* Simple Staff Header */}
@@ -78,7 +80,7 @@ const MainLayout = () => {
                                 <button onClick={() => setShowLogoutModal(false)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
                                     Cancel
                                 </button>
-                                <button onClick={logout} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
+                                <button onClick={authLogout} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
                                     Sign Out
                                 </button>
                             </div>
@@ -90,6 +92,10 @@ const MainLayout = () => {
     }
 
     // --- ADMIN VIEW ---
+    if (user?.role !== 'ADMIN') {
+        return <Login />;
+    }
+
     const renderContent = () => {
         if (currentRoute.path === '/assets/edit') return <AdminAssetForm />;
         if (currentRoute.path === '/users/edit') return <AdminUserForm />;
@@ -210,16 +216,16 @@ const MainLayout = () => {
                                 onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                                 className="flex items-center gap-3 pl-2 pr-4 py-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600 transition-all shadow-sm"
                             >
-                                {currentUser.avatarUrl ? (
-                                    <img src={currentUser.avatarUrl} className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-600 object-cover" alt="Profile" />
+                                {user?.avatarUrl ? (
+                                    <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-600 object-cover" alt="Profile" />
                                 ) : (
                                     <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
                                         <User size={16} />
                                     </div>
                                 )}
                                 <div className="text-left hidden lg:block">
-                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 leading-none mb-0.5">{currentUser.name}</p>
-                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-none uppercase font-bold">{currentUser.role}</p>
+                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 leading-none mb-0.5">{user?.name}</p>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-none uppercase font-bold">{user?.role}</p>
                                 </div>
                                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -228,8 +234,8 @@ const MainLayout = () => {
                                 <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
                                     <div className="p-2">
                                         <div className="px-3 py-2 border-b border-slate-50 dark:border-slate-700/50 mb-1 lg:hidden">
-                                            <p className="font-semibold text-slate-800 dark:text-slate-200">{currentUser.name}</p>
-                                            <p className="text-xs text-slate-500">{currentUser.email}</p>
+                                            <p className="font-semibold text-slate-800 dark:text-slate-200">{user?.name}</p>
+                                            <p className="text-xs text-slate-500">{user?.email}</p>
                                         </div>
 
                                         {/* Dark Mode Toggle Item */}
@@ -267,7 +273,7 @@ const MainLayout = () => {
             </div>
 
             {/* Admin Logout Confirmation Modal */}
-            {showLogoutModal && currentUser.role === 'ADMIN' && (
+            {showLogoutModal && user?.role === 'ADMIN' && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowLogoutModal(false)}></div>
                     <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 max-w-sm w-full relative z-10 shadow-2xl animate-in fade-in zoom-in duration-200 border border-slate-100 dark:border-slate-700">
@@ -280,7 +286,7 @@ const MainLayout = () => {
                             <button onClick={() => setShowLogoutModal(false)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
                                 Cancel
                             </button>
-                            <button onClick={logout} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
+                            <button onClick={authLogout} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
                                 Sign Out
                             </button>
                         </div>
