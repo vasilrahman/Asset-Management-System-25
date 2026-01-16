@@ -1,54 +1,62 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line
 } from 'recharts';
 import { Package, Activity, CheckCircle, Clock, MoreHorizontal, ArrowUpRight, AlertTriangle } from 'lucide-react';
+import { fetchDashboardData, DashboardData } from '../services/dashboardService';
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const AdminDashboard = () => {
-    const { assets, logs, complaints, navigate } = useApp();
+    const { navigate } = useApp();
+    const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const data = await fetchDashboardData();
+                setDashboardData(data);
+            } catch (error) {
+                console.error('Failed to fetch dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, []);
+
+    if (loading || !dashboardData) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-lg text-slate-600 dark:text-slate-400">Loading dashboard...</div>
+            </div>
+        );
+    }
 
     // KPIs
-    const totalAssets = assets.length;
-    const activeAssets = assets.filter(a => a.status === 'Active').length;
-
-    const today = new Date().toISOString().split('T')[0];
-    const verifiedToday = logs.filter(l => l.timestamp.startsWith(today)).length;
-
-    const pendingVerification = assets.filter(a => {
-        if (!a.lastVerifiedDate) return true;
-        const daysDiff = (new Date().getTime() - new Date(a.lastVerifiedDate).getTime()) / (1000 * 3600 * 24);
-        return daysDiff > 30;
-    }).length;
-
-    // Chart Data Preparation
-    const categoryData = assets.reduce((acc: any[], curr) => {
-        const existing = acc.find(i => i.name === curr.category);
-        if (existing) existing.value++;
-        else acc.push({ name: curr.category, value: 1 });
-        return acc;
-    }, []);
-
-    const statusData = assets.reduce((acc: any[], curr) => {
-        const existing = acc.find(i => i.name === curr.status);
-        if (existing) existing.value++;
-        else acc.push({ name: curr.status, value: 1 });
-        return acc;
-    }, []);
-
-    // Verification Trend Mock Data (Last 7 days)
-    const trendData = [
-        { day: 'Mon', count: 4 },
-        { day: 'Tue', count: 7 },
-        { day: 'Wed', count: 5 },
-        { day: 'Thu', count: 12 },
-        { day: 'Fri', count: 8 },
-        { day: 'Sat', count: 2 },
-        { day: 'Sun', count: verifiedToday },
-    ];
+    const { totalAssets, activeAssets, verifiedToday, complaintsCount, charts, recent } = dashboardData;
+    
+    // Transform data for charts
+    const assetsByCategory = (charts?.assetsByCategory || []).map(item => ({ name: item.category, value: item.count }));
+    const assetsByStatus = (charts?.assetsByStatus || []).map(item => ({ name: item.status, value: item.count }));
+    const verificationTrend = (charts?.verificationTrend || []).map(item => ({ day: item.date, count: item.count }));
+    
+    // Extract recent data
+    const recentAssets = recent?.recentAssets || [];
+    const recentVerifiedRaw = recent?.recentVerified || [];
+    const recentVerified = recentVerifiedRaw.map((item, index) => {
+        const asset = recentAssets.find(a => a.id === item.assetId);
+        return {
+            id: item.assetId || index.toString(),
+            assetName: asset?.name || 'Unknown',
+            verifiedBy: item.verifiedBy,
+            timestamp: item.verifiedAt,
+        };
+    });
+    
 
     return (
         <div className="space-y-8 pb-12">
@@ -57,7 +65,7 @@ export const AdminDashboard = () => {
                 <KpiCard title="Total Assets" value={totalAssets} icon={<Package />} trend="+12%" />
                 <KpiCard title="Active Assets" value={activeAssets} icon={<Activity />} trend="+5%" />
                 <KpiCard title="Verified Today" value={verifiedToday} icon={<CheckCircle />} trend="+8%" />
-                <KpiCard title="Complaints Issued" value={complaints.length} icon={<AlertTriangle />} trend="+2%" isNegative />
+                <KpiCard title="Complaints Issued" value={complaintsCount} icon={<AlertTriangle />} trend="+2%" isNegative />
             </div>
 
             {/* Row 1: Charts */}
@@ -69,7 +77,7 @@ export const AdminDashboard = () => {
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
-                                    data={categoryData}
+                                    data={assetsByCategory}
                                     cx="50%"
                                     cy="50%"
                                     innerRadius={50}
@@ -78,7 +86,7 @@ export const AdminDashboard = () => {
                                     dataKey="value"
                                     stroke="none"
                                 >
-                                    {categoryData.map((entry, index) => (
+                                    {assetsByCategory.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
@@ -94,7 +102,7 @@ export const AdminDashboard = () => {
                     <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Assets by Status</h3>
                     <div className="h-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={statusData} barSize={32}>
+                            <BarChart data={assetsByStatus} barSize={32}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} dy={10} />
                                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
@@ -110,7 +118,7 @@ export const AdminDashboard = () => {
                     <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-4">Verification Trend</h3>
                     <div className="h-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={trendData}>
+                            <LineChart data={verificationTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
                                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} dy={10} />
                                 <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
@@ -140,7 +148,7 @@ export const AdminDashboard = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {assets.slice(0, 5).map(asset => (
+                                {recentAssets.map(asset => (
                                     <tr key={asset.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
                                         <td className="px-4 py-3 text-slate-500 dark:text-slate-400 text-sm">{asset.id}</td>
                                         <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">{asset.name}</td>
@@ -168,7 +176,7 @@ export const AdminDashboard = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {logs.slice(0, 5).map(log => (
+                                {recentVerified.map(log => (
                                     <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30">
                                         <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">{log.assetName}</td>
                                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{log.verifiedBy}</td>

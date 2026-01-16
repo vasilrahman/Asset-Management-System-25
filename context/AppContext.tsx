@@ -10,7 +10,6 @@ interface RouteState {
 }
 
 interface AppContextType {
-  currentUser: User | null;
   assets: Asset[];
   users: User[];
   logs: VerificationLog[];
@@ -19,8 +18,6 @@ interface AppContextType {
   theme: Theme;
 
   navigate: (path: string, params?: any) => void;
-  login: (user: User) => void;
-  logout: () => void;
   toggleTheme: () => void;
 
   addAsset: (asset: Asset) => void;
@@ -52,7 +49,6 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children?: ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [logs, setLogs] = useState<VerificationLog[]>(INITIAL_LOGS);
@@ -114,16 +110,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
   const navigate = (path: string, params?: any) => {
     setCurrentRoute({ path, params });
-  };
-
-  const login = (user: User) => {
-    setCurrentUser(user);
-    navigate(user.role === 'ADMIN' ? '/dashboard' : '/staff/home');
-  };
-
-  const logout = () => {
-    setCurrentUser(null);
-    navigate('/');
   };
 
   const addAsset = (asset: Asset) => {
@@ -220,7 +206,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   return (
     <AppContext.Provider
       value={{
-        currentUser,
         assets,
         users,
         logs,
@@ -228,8 +213,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         currentRoute,
         theme,
         navigate,
-        login,
-        logout,
         toggleTheme,
         addAsset,
         updateAsset,
@@ -241,7 +224,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         verifyAsset,
         createDummyAssets,
         registerAsset,
-        notifications, text: 'notifications',
+        notifications,
         addNotification,
         markAllNotificationsRead,
         toast,
