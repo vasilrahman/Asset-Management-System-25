@@ -1,43 +1,112 @@
 
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../context/AppContext';
 import { User } from '../types';
-import { User as UserIcon, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { User as UserIcon, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
+import { useApp } from '../context/AppContext';
 
 export const AdminUserForm = () => {
-  const { addUser, updateUser, navigate, users, currentRoute } = useApp();
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
+  const { navigate } = useApp();
   
   // User State - removed random avatarUrl default
   const [userData, setUserData] = useState<Partial<User>>({
       name: '', username: '', password: '', email: '', phone: '', designation: '', role: 'STAFF', isActive: true, avatarUrl: ''
   });
 
-  useEffect(() => {
-    // Check if we are in Edit mode
-    if (currentRoute.path === '/users/edit' && currentRoute.params?.id) {
-        const foundUser = users.find(u => u.id === currentRoute.params.id);
-        if (foundUser) {
-            setEditUserId(foundUser.id);
-            setUserData(foundUser);
-        }
-    }
-  }, [currentRoute, users]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Check if we are in Edit mode (for future implementation)
+  useEffect(() => {
+    // For now, this is always add mode
+    setEditUserId(null);
+  }, []);
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!userData.name?.trim()) newErrors.name = 'Full name is required';
+    if (!userData.designation?.trim()) newErrors.designation = 'Designation is required';
+    if (!userData.email?.trim()) newErrors.email = 'Email is required';
+    if (!userData.phone?.trim()) newErrors.phone = 'Phone number is required';
+    if (!userData.username?.trim()) newErrors.username = 'Username is required';
+    if (!editUserId && !userData.password?.trim()) newErrors.password = 'Password is required';
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (userData.email && !emailRegex.test(userData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Phone validation (basic)
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    if (userData.phone && !phoneRegex.test(userData.phone.replace(/[\s\-\(\)\.]/g, ''))) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editUserId) {
-        updateUser(editUserId, userData);
-        alert('User updated successfully');
-    } else {
-        const id = `u-${Date.now()}`;
-        addUser({ ...userData, id } as User);
-        alert('User created successfully');
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const response = await fetch('http://localhost:3000/admin/users', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: userData.name,
+          username: userData.username,
+          password: userData.password,
+          email: userData.email,
+          phone: userData.phone,
+          designation: userData.designation,
+          role: userData.role,
+          isActive: userData.isActive,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create user');
+      }
+
+      // Show success toast
+      setShowSuccessToast(true);
+      
+      // Reset form
+      setUserData({
+        name: '', username: '', password: '', email: '', phone: '', designation: '', role: 'STAFF', isActive: true, avatarUrl: ''
+      });
+      setErrors({});
+
+      // Redirect after a short delay
+      setTimeout(() => {
+        setShowSuccessToast(false);
+        navigate('/users');
+      }, 2000);
+
+    } catch (err) {
+      console.error('Failed to create user:', err);
+      setErrors({ submit: err instanceof Error ? err.message : 'Failed to create user' });
+    } finally {
+      setIsSubmitting(false);
     }
-    navigate('/users');
   };
 
   const roleOptions = [
@@ -46,7 +115,15 @@ export const AdminUserForm = () => {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 relative">
+       {/* Success Toast */}
+       {showSuccessToast && (
+         <div className="fixed top-4 right-4 z-50 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+           <CheckCircle size={20} />
+           <span className="font-medium">User created successfully!</span>
+         </div>
+       )}
+
        <div className="flex items-center gap-4">
             <button onClick={() => navigate('/users')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
                 <ArrowLeft size={24} />
@@ -79,10 +156,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.name}
                                 onChange={e => setUserData({...userData, name: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.name ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="John Doe"
                             />
                         </div>
+                        {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                     </div>
 
                     <div>
@@ -92,10 +172,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.designation}
                                 onChange={e => setUserData({...userData, designation: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.designation ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="e.g. IT Manager"
                             />
                         </div>
+                        {errors.designation && <p className="text-red-500 text-xs mt-1">{errors.designation}</p>}
                     </div>
 
                     <div>
@@ -106,10 +189,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.email}
                                 onChange={e => setUserData({...userData, email: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.email ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="john@company.com"
                             />
                         </div>
+                        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                     </div>
 
                     <div>
@@ -119,10 +205,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.phone}
                                 onChange={e => setUserData({...userData, phone: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.phone ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="+1 555 000 0000"
                             />
                         </div>
+                        {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                     </div>
 
                     <div>
@@ -131,9 +220,12 @@ export const AdminUserForm = () => {
                             required
                             value={userData.username}
                             onChange={e => setUserData({...userData, username: e.target.value})}
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                            className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                              errors.username ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                            }`} 
                             placeholder="johndoe"
                         />
+                        {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
                     </div>
 
                     <div>
@@ -144,13 +236,16 @@ export const AdminUserForm = () => {
                                 required={!editUserId} // Only required for new users
                                 value={userData.password}
                                 onChange={e => setUserData({...userData, password: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 pr-12 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 pr-12 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.password ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="••••••••"
                             />
                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
+                        {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                     </div>
 
                     <div>
@@ -176,11 +271,24 @@ export const AdminUserForm = () => {
            </div>
 
            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-700">
-               <button type="button" onClick={() => navigate('/users')} className="px-6 py-3 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
+               {errors.submit && (
+                 <div className="flex-1 text-red-500 text-sm bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-200 dark:border-red-800">
+                   {errors.submit}
+                 </div>
+               )}
+               <button type="button" onClick={() => {/* navigate('/users') */}} className="px-6 py-3 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
                    Cancel
                </button>
-               <button type="submit" className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
-                   {editUserId ? 'Update User' : 'Create User'}
+               <button 
+                 type="submit" 
+                 disabled={isSubmitting}
+                 className={`px-8 py-3 font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors ${
+                   isSubmitting 
+                     ? 'bg-indigo-400 cursor-not-allowed text-white' 
+                     : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                 }`}
+               >
+                 {isSubmitting ? 'Creating User...' : (editUserId ? 'Update User' : 'Create User')}
                </button>
            </div>
        </form>
