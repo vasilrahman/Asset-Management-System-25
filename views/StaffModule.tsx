@@ -77,7 +77,7 @@ export const StaffModule = () => {
             if (scannerMode === 'REGISTER') {
                 setScannedQRData({
                     qrId: response.qrId,
-                    qrCode: response.code,
+                    qrCode: data,
                     alreadyAssigned: response.alreadyAssigned
                 });
 
