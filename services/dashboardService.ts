@@ -106,3 +106,40 @@ export const fetchUsers = async (): Promise<User[]> => {
     return [];
   }
 };
+
+export interface QRCode {
+  code: string;
+}
+
+export const generateQRCodes = async (count: number): Promise<QRCode[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.post(
+    `${API_BASE_URL}/admin/qr/generate`,
+    { count },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  console.log('QR API Response:', response.data);
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else if (data && Array.isArray(data.qrCodes)) {
+    return data.qrCodes;
+  } else {
+    console.error('Unexpected response format:', data);
+    throw new Error('Invalid response format from backend');
+  }
+};
