@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Asset, User, Complaint, VerificationLog, Theme, Notification } from '../types';
 import { INITIAL_ASSETS, INITIAL_USERS, INITIAL_LOGS } from '../mockData';
+import { useAuth } from './AuthContext';
 
 // Simple Router State to replace React Router for this demo
 interface RouteState {
@@ -49,6 +50,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children?: ReactNode }) => {
+  const { user: currentUser } = useAuth();
   const [assets, setAssets] = useState<Asset[]>(INITIAL_ASSETS);
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [logs, setLogs] = useState<VerificationLog[]>(INITIAL_LOGS);

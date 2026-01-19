@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Asset, VerificationLog, Complaint } from '../types';
+import { Asset, VerificationLog, Complaint, User } from '../types';
 
 export interface DashboardData {
   totalAssets: number;
@@ -68,6 +68,29 @@ export const fetchComplaints = async (): Promise<Complaint[]> => {
   }
 
   const response = await axios.get(`${API_BASE_URL}/admin/complaints`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else {
+    return [];
+  }
+};
+
+export const fetchUsers = async (): Promise<User[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/admin/users`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
