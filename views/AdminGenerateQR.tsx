@@ -1,12 +1,11 @@
 
 import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
 import { QrCode, Download, Loader } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { generateQRCodes } from '../services/dashboardService';
 
 export const AdminGenerateQR = () => {
-  const { createDummyAssets } = useApp();
   const [count, setCount] = useState<number>(1);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -20,29 +19,37 @@ export const AdminGenerateQR = () => {
     setIsGenerating(true);
     
     try {
-        // 1. Create Dummy Assets in DB
-        const newAssets = await createDummyAssets(count);
+        console.log('Requesting', count, 'QR codes...');
         
-        // 2. Generate PDF
+        // 1. Call backend API to generate QR codes
+        const qrCodes = await generateQRCodes(count);
+        
+        console.log('Received QR codes:', qrCodes);
+        
+        if (!qrCodes || qrCodes.length === 0) {
+            throw new Error('No QR codes received from backend');
+        }
+        
+        // 2. Generate PDF with QR codes from backend
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text("AMS - Unassigned QR Codes", 105, 15, { align: 'center' });
+        doc.text("AMS – Unassigned QR Codes", 105, 15, { align: 'center' });
         doc.setFontSize(10);
         doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 22, { align: 'center' });
 
-        // Grid Configuration
-        const cols = 4;
-        const startX = 15;
-        const startY = 30;
-        const cellWidth = 45; // slightly larger than 40mm to accommodate padding
-        const cellHeight = 55; // 40mm QR + text
+        // Grid Configuration: 3 QR codes per row
+        const cols = 3;
+        const startX = 20;
+        const startY = 35;
+        const cellWidth = 55;
+        const cellHeight = 65;
         const marginX = 5;
         const marginY = 5;
 
         let col = 0;
         let row = 0;
 
-        for (const asset of newAssets) {
+        for (const qrCode of qrCodes) {
             const x = startX + col * (cellWidth + marginX);
             const y = startY + row * (cellHeight + marginY);
 
@@ -50,33 +57,50 @@ export const AdminGenerateQR = () => {
             doc.setDrawColor(200, 200, 200);
             doc.rect(x, y, cellWidth, cellHeight);
 
-            // Generate QR Data URL
-            const qrUrl = await QRCode.toDataURL(JSON.stringify({ assetId: asset.id }), { width: 400, margin: 1 });
-            doc.addImage(qrUrl, 'PNG', x + 2.5, y + 2.5, 40, 40);
+            // Generate QR Data URL using backend QR code
+            // Force image-based generation (no canvas)
+            const qrUrl = await QRCode.toDataURL(qrCode.code, {
+                width: 300,
+                margin: 1,
+                type: 'image/png',
+                errorCorrectionLevel: 'H'
+            });
+            doc.addImage(qrUrl, 'PNG', x + 7.5, y + 5, 40, 40);
 
-            // Text Label - ID Format Only - REMOVED "Scan to Register"
-            doc.setFontSize(10);
-            doc.text(`ID: ${asset.id}`, x + cellWidth/2, y + 50, { align: 'center' });
+            // Display QR Code ID
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            doc.text(`QR Code: ${qrCode.code}`, x + cellWidth/2, y + 50, { align: 'center' });
+            
+            // Display QR Code text (truncated if too long)
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "normal");
+            const qrText = qrCode.code.length > 30 
+                ? qrCode.code.substring(0, 30) + '...' 
+                : qrCode.code;
+            doc.text(qrText, x + cellWidth/2, y + 56, { align: 'center', maxWidth: cellWidth - 4 });
 
             col++;
             if (col >= cols) {
                 col = 0;
                 row++;
                 // Check if new page needed
-                if (startY + (row + 1) * (cellHeight + marginY) > 280) {
+                if (startY + (row + 1) * (cellHeight + marginY) > 270) {
                     doc.addPage();
                     row = 0;
                 }
             }
         }
 
+        // Download PDF directly on client side
         doc.save(`AMS_QR_Batch_${Date.now()}.pdf`);
-        alert(`${count} QR Codes generated and downloaded successfully.`);
+        alert(`${qrCodes.length} QR Codes generated and downloaded successfully.`);
         setCount(1);
 
-    } catch (error) {
-        console.error("Generation failed", error);
-        alert("Failed to generate QR codes.");
+    } catch (error: any) {
+        console.error("Generation failed:", error);
+        const errorMessage = error?.response?.data?.message || error?.message || 'Unknown error occurred';
+        alert(`Failed to generate QR codes: ${errorMessage}`);
     } finally {
         setIsGenerating(false);
     }
