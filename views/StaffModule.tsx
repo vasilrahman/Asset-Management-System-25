@@ -5,13 +5,16 @@ import { Asset, AssetCategory, AssetStatus } from '../types';
 import { QrCode, Box, ClipboardCheck, AlertTriangle, ChevronLeft, Camera, Check, Search, X, Package, Tag, Save, RefreshCw, Image as ImageIcon, ScanLine } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
 import jsQR from 'jsqr';
+import { StaffRegisterAsset } from './StaffRegisterAsset';
+import { verifyQRCode } from '../services/dashboardService';
 
-type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM';
+type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM' | 'REGISTER_ASSET';
 
 export const StaffModule = () => {
     const { assets, logs, verifyAsset, currentUser, addComplaint, registerAsset } = useApp();
     const [view, setView] = useState<ViewState>('HOME');
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+    const [scannedQRData, setScannedQRData] = useState<{ qrId: string; qrCode: string; alreadyAssigned?: boolean } | null>(null);
     const [complaintText, setComplaintText] = useState('');
 
     // History View State
@@ -39,45 +42,40 @@ export const StaffModule = () => {
 
     // Scanner Mode: 'VERIFY' or 'REGISTER'
     const [scannerMode, setScannerMode] = useState<'VERIFY' | 'REGISTER'>('VERIFY');
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+
+    // Show toast message
+    const showToast = (message: string, type: 'success' | 'error' | 'warning') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     // Handle successful scan (string data)
-    const handleScanResult = (data: string) => {
-        let assetId = data;
+    const handleScanResult = async (data: string) => {
         try {
-            const parsed = JSON.parse(data);
-            if (parsed.assetId) {
-                assetId = parsed.assetId;
-            }
-        } catch (e) {
-            // Not JSON, assume raw ID
-        }
+            // Call backend API to verify QR code
+            const response = await verifyQRCode(data);
 
-        const asset = assets.find(a => a.id === assetId.trim() || a.serialNumber === assetId.trim());
-
-        if (asset) {
-            // Logic for handling Dummy Assets
-            if (asset.isDummy) {
-                if (scannerMode === 'REGISTER') {
-                    setSelectedAsset(asset);
-                    setView('REGISTER_FORM');
-                } else {
-                    if (confirm("This is an unassigned QR code. Do you want to register it?")) {
-                        setScannerMode('REGISTER');
-                        setSelectedAsset(asset);
-                        setView('REGISTER_FORM');
-                    }
-                }
-            } else {
-                // Logic for Registered Assets
-                if (scannerMode === 'REGISTER') {
-                    alert("This asset is already registered.");
-                } else {
-                    setSelectedAsset(asset);
-                    setView('DETAIL');
-                }
+            if (!response.valid) {
+                // Invalid QR code
+                showToast(response.message || 'Invalid QR code', 'error');
+                return;
             }
-        } else {
-            alert(`Asset not found: ${assetId}`);
+
+            // Valid QR code - navigate to Register Asset page
+            if (response.qrId && response.code) {
+                setScannedQRData({ 
+                    qrId: response.qrId, 
+                    qrCode: response.code,
+                    alreadyAssigned: response.alreadyAssigned || false
+                });
+                setView('REGISTER_ASSET');
+            }
+
+        } catch (error: any) {
+            console.error('QR verification failed:', error);
+            const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify QR code';
+            showToast(errorMessage, 'error');
         }
     };
 
@@ -302,6 +300,7 @@ export const StaffModule = () => {
     if (view === 'HOME') {
         return (
             <div className="p-6 space-y-8 animate-in fade-in duration-300">
+                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
                     <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
                     <p className="text-indigo-100 font-light">What would you like to do today?</p>
@@ -346,10 +345,25 @@ export const StaffModule = () => {
         );
     }
 
-    // 2. Scanner View
+    // 2. Register Asset View
+    if (view === 'REGISTER_ASSET') {
+        return (
+            <StaffRegisterAsset 
+                qrCode={scannedQRData?.qrCode || "QR-807182-623"} 
+                qrId={scannedQRData?.qrId}
+                onBack={() => {
+                    setScannedQRData(null);
+                    setView('HOME');
+                }} 
+            />
+        );
+    }
+
+    // 3. Scanner View
     if (view === 'SCANNER') {
         return (
             <div className="fixed inset-0 bg-black text-white z-50 flex flex-col">
+                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="p-6 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent absolute top-0 w-full z-10">
                     <button onClick={() => setView('HOME')} className="bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-colors"><X size={24} /></button>
                     <span className="font-medium tracking-wide">{scannerMode === 'REGISTER' ? 'Scan New QR' : 'Scan Asset QR'}</span>
@@ -775,3 +789,18 @@ const InfoCard = ({ label, value }: { label: string, value: string }) => (
         <p className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={value}>{value}</p>
     </div>
 );
+
+// Toast Component
+const Toast = ({ message, type }: { message: string; type: 'success' | 'error' | 'warning' }) => {
+    const bgColors = {
+        success: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200',
+        error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
+        warning: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+    };
+
+    return (
+        <div className={`fixed top-4 right-4 z-50 ${bgColors[type]} border px-6 py-4 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300`}>
+            <p className="font-medium">{message}</p>
+        </div>
+    );
+};

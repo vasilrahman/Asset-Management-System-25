@@ -143,3 +143,58 @@ export const generateQRCodes = async (count: number): Promise<QRCode[]> => {
     throw new Error('Invalid response format from backend');
   }
 };
+
+export interface RegisterAssetPayload {
+  qrCode: string;
+  assetName: string;
+  category: string;
+  serialNumber?: string;
+}
+
+export const registerAsset = async (payload: RegisterAssetPayload): Promise<any> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.post(
+    `${API_BASE_URL}/staff/assets/register`,
+    payload,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return response.data;
+};
+
+export interface VerifyQRResponse {
+  valid: boolean;
+  message?: string;
+  qrId?: string;
+  code?: string;
+  alreadyAssigned?: boolean;
+}
+
+export const verifyQRCode = async (qrCode: string): Promise<VerifyQRResponse> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.post(
+    `${API_BASE_URL}/staff/qr/verify`,
+    { qrCode },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  return response.data;
+};
