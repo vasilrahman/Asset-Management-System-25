@@ -57,18 +57,30 @@ export const StaffModule = () => {
             const response = await verifyQRCode(data);
 
             if (!response.valid) {
-                // Invalid QR code
                 showToast(response.message || 'Invalid QR code', 'error');
                 return;
             }
 
-            // Valid QR code - navigate to Register Asset page
-            if (response.qrId && response.code) {
-                setScannedQRData({ 
-                    qrId: response.qrId, 
+            // ✅ VERIFY FLOW
+            if (scannerMode === 'VERIFY') {
+                if (!response.alreadyAssigned || !response.asset) {
+                    showToast('This QR is not registered yet', 'warning');
+                    return;
+                }
+
+                setSelectedAsset(response.asset);
+                setView('DETAIL');
+                return;
+            }
+
+            // ✅ REGISTER FLOW
+            if (scannerMode === 'REGISTER') {
+                setScannedQRData({
+                    qrId: response.qrId,
                     qrCode: response.code,
-                    alreadyAssigned: response.alreadyAssigned || false
+                    alreadyAssigned: response.alreadyAssigned
                 });
+
                 setView('REGISTER_ASSET');
             }
 
