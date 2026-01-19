@@ -177,6 +177,7 @@ export interface VerifyQRResponse {
   qrId?: string;
   code?: string;
   alreadyAssigned?: boolean;
+  asset?: any;
 }
 
 export const verifyQRCode = async (qrCode: string): Promise<VerifyQRResponse> => {
