@@ -37,3 +37,26 @@ export const fetchDashboardData = async (): Promise<DashboardData> => {
 
   return response.data;
 };
+
+export const fetchVerifications = async (): Promise<VerificationLog[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/admin/verifications`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else {
+    return [];
+  }
+};
