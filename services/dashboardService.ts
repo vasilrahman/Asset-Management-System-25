@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Asset, VerificationLog, Complaint, User } from '../types';
+import { API_BASE_URL } from '../config/api';
 
 export interface DashboardData {
   totalAssets: number;
@@ -21,7 +22,8 @@ export interface DashboardData {
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Fallback if config not available
+const apiBaseUrl = API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3015';
 
 export const fetchDashboardData = async (): Promise<DashboardData> => {
   const token = localStorage.getItem('accessToken');
@@ -29,7 +31,7 @@ export const fetchDashboardData = async (): Promise<DashboardData> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/dashboard`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/dashboard`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -44,7 +46,7 @@ export const fetchVerifications = async (): Promise<VerificationLog[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/verifications`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/verifications`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -67,7 +69,7 @@ export const fetchComplaints = async (): Promise<Complaint[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/complaints`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/complaints`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -90,7 +92,7 @@ export const fetchUsers = async (): Promise<User[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/users`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/users`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -206,7 +208,7 @@ export const getStaffAssets = async (): Promise<Asset[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/staff/assets`, {
+  const response = await axios.get(`${apiBaseUrl}/staff/assets`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -229,7 +231,7 @@ export const getStaffVerifiedHistory = async (): Promise<VerificationLog[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/staff/history/verified`, {
+  const response = await axios.get(`${apiBaseUrl}/staff/history/verified`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -252,7 +254,7 @@ export const getStaffComplaintHistory = async (): Promise<Complaint[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/staff/history/complaints`, {
+  const response = await axios.get(`${apiBaseUrl}/staff/history/complaints`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

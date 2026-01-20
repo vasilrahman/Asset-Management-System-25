@@ -38,7 +38,8 @@ export const AdminComplaints = () => {
                 throw new Error('No access token found');
             }
 
-            const response = await fetch(`http://localhost:3000/admin/complaints/${complaintId}/resolve`, {
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+            const response = await fetch(`${apiBaseUrl}/admin/complaints/${complaintId}/resolve`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${token}`,

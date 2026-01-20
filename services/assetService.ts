@@ -1,6 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Fallback if config not available
+const apiBaseUrl = API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3015';
 
 export interface FetchAssetsParams {
   search?: string;
@@ -33,7 +35,7 @@ export const fetchAssets = async (params: FetchAssetsParams): Promise<FetchAsset
   if (params.page) queryParams.append('page', params.page.toString());
   if (params.limit) queryParams.append('limit', params.limit.toString());
 
-  const response = await axios.get(`${API_BASE_URL}/admin/assets?${queryParams.toString()}`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/assets?${queryParams.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -48,7 +50,7 @@ export const fetchAssetById = async (assetId: string): Promise<any> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/assets/${assetId}`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/assets/${assetId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -63,7 +65,7 @@ export const fetchAssetVerifications = async (assetId: string): Promise<any[]> =
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/assets/${assetId}/verifications`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/assets/${assetId}/verifications`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -86,7 +88,7 @@ export const fetchAssetComplaints = async (assetId: string): Promise<any[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/assets/${assetId}/complaints`, {
+  const response = await axios.get(`${apiBaseUrl}/admin/assets/${assetId}/complaints`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -109,7 +111,7 @@ export const fetchStaffAssets = async (): Promise<any[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/staff/assets`, {
+  const response = await axios.get(`${apiBaseUrl}/staff/assets`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -124,7 +126,7 @@ export const fetchStaffVerifiedHistory = async (): Promise<any[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/staff/history/verified`, {
+  const response = await axios.get(`${apiBaseUrl}/staff/history/verified`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -139,7 +141,7 @@ export const fetchStaffComplaintsHistory = async (): Promise<any[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/staff/history/complaints`, {
+  const response = await axios.get(`${apiBaseUrl}/staff/history/complaints`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -150,7 +152,7 @@ export const fetchStaffComplaintsHistory = async (): Promise<any[]> => {
 
 export const verifyStaffAsset = async (assetId: string): Promise<void> => {
   console.log('verifyStaffAsset called with:', assetId);
-  console.log('API_BASE_URL:', API_BASE_URL);
+  console.log('apiBaseUrl:', apiBaseUrl);
   
   const token = localStorage.getItem('accessToken');
   console.log('Token exists:', !!token);
@@ -159,7 +161,7 @@ export const verifyStaffAsset = async (assetId: string): Promise<void> => {
     throw new Error('No access token found');
   }
 
-  const url = `${API_BASE_URL}/staff/assets/verify`;
+  const url = `${apiBaseUrl}/staff/assets/verify`;
   console.log('Making POST request to:', url);
   console.log('Request body:', { assetId });
   
@@ -183,7 +185,7 @@ export const submitStaffComplaint = async (data: {
   imageUrl?: string;
 }): Promise<void> => {
   console.log('submitStaffComplaint called with:', data);
-  console.log('API_BASE_URL:', API_BASE_URL);
+  console.log('apiBaseUrl:', apiBaseUrl);
   
   const token = localStorage.getItem('accessToken');
   console.log('Token exists:', !!token);
@@ -192,7 +194,7 @@ export const submitStaffComplaint = async (data: {
     throw new Error('No access token found');
   }
 
-  const url = `${API_BASE_URL}/staff/complaints`;
+  const url = `${apiBaseUrl}/staff/complaints`;
   console.log('Making POST request to:', url);
   
   const response = await axios.post(
@@ -235,7 +237,7 @@ export const regenerateAssetQR = async (assetId: string): Promise<any> => {
   }
 
   const response = await axios.post(
-    `${API_BASE_URL}/admin/assets/${assetId}/regenerate-qr`,
+    `${apiBaseUrl}/admin/assets/${assetId}/regenerate-qr`,
     {},
     {
       headers: {
