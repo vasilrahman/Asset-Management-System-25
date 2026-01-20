@@ -63,7 +63,8 @@ export const AdminUserForm = () => {
         throw new Error('No access token found');
       }
 
-      const response = await fetch('http://localhost:3000/admin/users', {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      const response = await fetch(`${apiBaseUrl}/admin/users`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
