@@ -199,3 +199,72 @@ export const verifyQRCode = async (qrCode: string): Promise<VerifyQRResponse> =>
 
   return response.data;
 };
+
+export const getStaffAssets = async (): Promise<Asset[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/staff/assets`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else {
+    return [];
+  }
+};
+
+export const getStaffVerifiedHistory = async (): Promise<VerificationLog[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/staff/history/verified`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else {
+    return [];
+  }
+};
+
+export const getStaffComplaintHistory = async (): Promise<Complaint[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/staff/history/complaints`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else {
+    return [];
+  }
+};

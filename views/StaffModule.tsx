@@ -7,12 +7,18 @@ import { CustomSelect } from '../components/CustomSelect';
 import jsQR from 'jsqr';
 import { StaffRegisterAsset } from './StaffRegisterAsset';
 import { verifyQRCode } from '../services/dashboardService';
-import { verifyStaffAsset, submitStaffComplaint } from '../services/assetService';
+import { verifyStaffAsset, submitStaffComplaint, fetchStaffAssets, fetchStaffVerifiedHistory, fetchStaffComplaintsHistory } from '../services/assetService';
 
 type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM' | 'REGISTER_ASSET';
 
 export const StaffModule = () => {
-    const { assets, logs, verifyAsset, currentUser, addComplaint, registerAsset } = useApp();
+    const { verifyAsset, currentUser, addComplaint, registerAsset } = useApp();
+    const [staffAssets, setStaffAssets] = useState<Asset[]>([]);
+    const [isLoadingAssets, setIsLoadingAssets] = useState(false);
+    const [verifiedHistory, setVerifiedHistory] = useState<any[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [complaintsHistory, setComplaintsHistory] = useState<any[]>([]);
+    const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
     const [view, setView] = useState<ViewState>('HOME');
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [scannedQRData, setScannedQRData] = useState<{ qrId: string; qrCode: string; alreadyAssigned?: boolean } | null>(null);
@@ -51,6 +57,72 @@ export const StaffModule = () => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
     };
+
+    // Fetch staff assets when ASSETS view is opened
+    useEffect(() => {
+        if (view === 'ASSETS') {
+            setIsLoadingAssets(true);
+            fetchStaffAssets()
+                .then(data => {
+                    setStaffAssets(data);
+                })
+                .catch(error => {
+                    console.error('Failed to fetch staff assets:', error);
+                    showToast('Failed to load assets', 'error');
+                    setStaffAssets([]);
+                })
+                .finally(() => {
+                    setIsLoadingAssets(false);
+                });
+        } else {
+            // Reset assets when leaving ASSETS view
+            setStaffAssets([]);
+            setAssetSearch('');
+        }
+    }, [view]);
+
+    // Fetch verified history when VERIFIED view is opened
+    useEffect(() => {
+        if (view === 'VERIFIED' && historyTab === 'VERIFIED') {
+            setIsLoadingHistory(true);
+            fetchStaffVerifiedHistory()
+                .then(data => {
+                    setVerifiedHistory(data);
+                })
+                .catch(error => {
+                    console.error('Failed to fetch verified history:', error);
+                    showToast('Failed to load history', 'error');
+                    setVerifiedHistory([]);
+                })
+                .finally(() => {
+                    setIsLoadingHistory(false);
+                });
+        } else if (view !== 'VERIFIED') {
+            // Reset history when leaving VERIFIED view
+            setVerifiedHistory([]);
+            setComplaintsHistory([]);
+            setHistorySearch('');
+        }
+    }, [view, historyTab]);
+
+    // Fetch complaints history when COMPLAINTS tab is selected
+    useEffect(() => {
+        if (view === 'VERIFIED' && historyTab === 'COMPLAINTS') {
+            setIsLoadingComplaints(true);
+            fetchStaffComplaintsHistory()
+                .then(data => {
+                    setComplaintsHistory(data);
+                })
+                .catch(error => {
+                    console.error('Failed to fetch complaints history:', error);
+                    showToast('Failed to load complaints', 'error');
+                    setComplaintsHistory([]);
+                })
+                .finally(() => {
+                    setIsLoadingComplaints(false);
+                });
+        }
+    }, [view, historyTab]);
 
     // Handle successful scan (string data)
     const handleScanResult = async (data: string) => {
@@ -599,7 +671,7 @@ export const StaffModule = () => {
 
     // 5. Asset List
     if (view === 'ASSETS') {
-        const filteredAssets = assets.filter(a =>
+        const filteredAssets = staffAssets.filter(a =>
             a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
             a.id.toLowerCase().includes(assetSearch.toLowerCase())
         );
@@ -621,24 +693,36 @@ export const StaffModule = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-3 pb-20 pr-1 custom-scrollbar">
-                    {filteredAssets.map(asset => (
-                        <div key={asset.id} onClick={() => { setSelectedAsset(asset); setView('DETAIL'); }} className="bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex gap-4 items-center cursor-pointer active:scale-95 transition-transform">
-                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0 flex items-center justify-center">
-                                {asset.imageUrl ? (
-                                    <img src={asset.imageUrl} className="w-full h-full object-cover" alt={asset.name} />
-                                ) : (
-                                    <Package className="text-slate-400 dark:text-slate-500" size={24} />
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-slate-800 dark:text-white truncate">{asset.name}</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1">{asset.id} • {asset.location}</p>
-                            </div>
-                            <div className="pr-2">
-                                <span className={`w-3 h-3 rounded-full block ${asset.status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                            </div>
+                    {isLoadingAssets ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                            <RefreshCw size={48} className="mb-4 opacity-20 animate-spin" />
+                            <p>Loading assets...</p>
                         </div>
-                    ))}
+                    ) : filteredAssets.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                            <Box size={48} className="mb-4 opacity-20" />
+                            <p>{assetSearch ? 'No assets found' : 'No assets available'}</p>
+                        </div>
+                    ) : (
+                        filteredAssets.map(asset => (
+                            <div key={asset.id} onClick={() => { setSelectedAsset(asset); setView('DETAIL'); }} className="bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex gap-4 items-center cursor-pointer active:scale-95 transition-transform">
+                                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0 flex items-center justify-center">
+                                    {asset.imageUrl ? (
+                                        <img src={asset.imageUrl} className="w-full h-full object-cover" alt={asset.name} />
+                                    ) : (
+                                        <Package className="text-slate-400 dark:text-slate-500" size={24} />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-slate-800 dark:text-white truncate">{asset.name}</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1">{asset.id} • {asset.location}</p>
+                                </div>
+                                <div className="pr-2">
+                                    <span className={`w-3 h-3 rounded-full block ${asset.status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         );
@@ -646,14 +730,12 @@ export const StaffModule = () => {
 
     // 6. History View (Verified / Complaints)
     if (view === 'VERIFIED') {
-        const filteredLogs = logs.filter(l =>
-            l.verifiedBy === currentUser?.name &&
-            (l.assetName.toLowerCase().includes(historySearch.toLowerCase()) || l.assetId.toLowerCase().includes(historySearch.toLowerCase()))
+        const filteredLogs = verifiedHistory.filter(l =>
+            l.assetName?.toLowerCase().includes(historySearch.toLowerCase()) || l.assetId?.toLowerCase().includes(historySearch.toLowerCase())
         );
 
-        const filteredComplaints = useApp().complaints.filter(c =>
-            c.reportedBy === currentUser?.name &&
-            (c.assetName.toLowerCase().includes(historySearch.toLowerCase()) || c.assetId.toLowerCase().includes(historySearch.toLowerCase()) || c.description.toLowerCase().includes(historySearch.toLowerCase()))
+        const filteredComplaints = complaintsHistory.filter(c =>
+            c.assetName?.toLowerCase().includes(historySearch.toLowerCase()) || c.assetId?.toLowerCase().includes(historySearch.toLowerCase()) || c.description?.toLowerCase().includes(historySearch.toLowerCase())
         );
 
         return (
@@ -693,54 +775,67 @@ export const StaffModule = () => {
                 <div className="space-y-4 overflow-y-auto pb-20 flex-1">
                     {historyTab === 'VERIFIED' ? (
                         <>
-                            {filteredLogs.length === 0 && (
+                            {isLoadingHistory ? (
+                                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                    <RefreshCw size={48} className="mb-4 opacity-20 animate-spin" />
+                                    <p>Loading history...</p>
+                                </div>
+                            ) : filteredLogs.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-10 text-slate-400">
                                     <ClipboardCheck size={48} className="mb-4 opacity-20" />
                                     <p>No verification history found.</p>
                                 </div>
+                            ) : (
+                                filteredLogs.map(log => (
+                                    <div key={log.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-bold text-slate-800 dark:text-white">{log.assetName}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{log.assetId}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{new Date(log.timestamp || log.verifiedAt || log.date).toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-full text-emerald-600 dark:text-emerald-400">
+                                            <Check size={18} />
+                                        </div>
+                                    </div>
+                                ))
                             )}
-                            {filteredLogs.map(log => (
-                                <div key={log.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                                    <div>
-                                        <p className="font-bold text-slate-800 dark:text-white">{log.assetName}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
-                                    </div>
-                                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-full text-emerald-600 dark:text-emerald-400">
-                                        <Check size={18} />
-                                    </div>
-                                </div>
-                            ))}
                         </>
                     ) : (
                         <>
-                            {filteredComplaints.length === 0 && (
+                            {isLoadingComplaints ? (
+                                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                    <RefreshCw size={48} className="mb-4 opacity-20 animate-spin" />
+                                    <p>Loading complaints...</p>
+                                </div>
+                            ) : filteredComplaints.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-10 text-slate-400">
                                     <AlertTriangle size={48} className="mb-4 opacity-20" />
                                     <p>No complaints raised found.</p>
                                 </div>
-                            )}
-                            {filteredComplaints.map(complaint => (
-                                <div key={complaint.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                            <p className="font-bold text-slate-800 dark:text-white">{complaint.assetName}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(complaint.date).toLocaleString()}</p>
+                            ) : (
+                                filteredComplaints.map(complaint => (
+                                    <div key={complaint.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-white">{complaint.assetName}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(complaint.date || complaint.createdAt || complaint.timestamp).toLocaleString()}</p>
+                                            </div>
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${complaint.status === 'Pending' || complaint.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                {complaint.status}
+                                            </span>
                                         </div>
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${complaint.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                            {complaint.status}
-                                        </span>
+                                        <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                            {complaint.description}
+                                        </p>
+                                        {complaint.imageUrl && (
+                                            <div className="mt-3">
+                                                <p className="text-xs font-semibold text-slate-500 mb-1">Evidence:</p>
+                                                <img src={complaint.imageUrl} alt="Evidence" className="h-24 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
+                                            </div>
+                                        )}
                                     </div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
-                                        {complaint.description}
-                                    </p>
-                                    {complaint.imageUrl && (
-                                        <div className="mt-3">
-                                            <p className="text-xs font-semibold text-slate-500 mb-1">Evidence:</p>
-                                            <img src={complaint.imageUrl} alt="Evidence" className="h-24 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </>
                     )}
                 </div>
@@ -767,7 +862,7 @@ export const StaffModule = () => {
                                 placeholder="Enter ID (e.g. AST-001)"
                                 required
                                 onBlur={(e) => {
-                                    const found = assets.find(a => a.id === e.target.value);
+                                    const found = staffAssets.find(a => a.id === e.target.value);
                                     if (found) setSelectedAsset(found);
                                 }}
                             />
