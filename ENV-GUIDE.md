@@ -6,7 +6,7 @@ Your application now supports both **server** and **local** environments with au
 
 ### Priority System:
 1. **Primary**: Server IP (192.168.185.91:3015)
-2. **Fallback**: Localhost (localhost:3015)
+2. **Fallback**: Localhost (localhost:3000)
 
 ## Configuration Files:
 
@@ -19,7 +19,7 @@ VITE_API_BASE_URL=http://192.168.185.91:3015
 ### 2. `.env.local` (Local Development)
 Vite automatically uses this for local development (has highest priority locally)
 ```
-VITE_API_BASE_URL=http://localhost:3015
+VITE_API_BASE_URL=http://localhost:3000
 ```
 
 ### 3. `.env.production` (Production Build)
@@ -41,13 +41,13 @@ npm run build
 ```bash
 # Vite automatically picks .env.local
 npm run dev
-# Uses localhost: http://localhost:3015
+# Uses localhost: http://localhost:3000
 ```
 
 ### Scenario 3: Testing Production Build Locally
 ```bash
 # Create .env.local temporarily
-echo "VITE_API_BASE_URL=http://localhost:3015" > .env.local
+echo "VITE_API_BASE_URL=http://localhost:3000" > .env.local
 npm run build
 npm run preview
 ```
@@ -65,7 +65,7 @@ The application also has automatic detection in `config/api.ts`:
 ### To Work Locally:
 1. Create/update `.env.local`:
    ```
-   VITE_API_BASE_URL=http://localhost:3015
+   VITE_API_BASE_URL=http://localhost:3000
    ```
 2. Start dev server: `npm run dev`
 
@@ -90,5 +90,5 @@ console.log('API URL:', import.meta.env.VITE_API_BASE_URL);
 
 Current configuration:
 - **Server URL**: http://192.168.185.91:3015 ✅
-- **Local URL**: http://localhost:3015 ✅
+- **Local URL**: http://localhost:3000 ✅
 - **Priority**: Server first, localhost fallback ✅

@@ -21,7 +21,7 @@ export const getApiBaseUrl = (): string => {
   }
   
   // If running on localhost, use localhost backend
-  return 'http://localhost:3015';
+  return 'http://localhost:3000';
 };
 
 // Export the API base URL
@@ -48,7 +48,7 @@ export const checkServerHealth = async (url: string): Promise<boolean> => {
 // Get API URL with health check fallback
 export const getApiUrlWithFallback = async (): Promise<string> => {
   const primaryUrl = 'http://192.168.185.91:3015';
-  const fallbackUrl = 'http://localhost:3015';
+  const fallbackUrl = 'http://localhost:3000';
   
   // Try primary (server) first
   const isServerHealthy = await checkServerHealth(primaryUrl);
