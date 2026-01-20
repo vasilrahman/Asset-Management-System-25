@@ -224,13 +224,17 @@ export const AdminAssets = () => {
                   <div className="col-span-2 w-full flex md:block justify-between">
                       <span className="md:hidden text-sm text-slate-400">Status:</span>
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
-                          asset.status === 'Active' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
-                          asset.status === 'Maintenance' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800' :
+                          asset.status?.toUpperCase() === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
+                          asset.status?.toUpperCase() === 'MAINTENANCE' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800' :
+                          asset.status?.toUpperCase() === 'RETIRED' ? 'bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600' :
+                          asset.status?.toUpperCase() === 'LOST' ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800' :
                           'bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'
                       }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${
-                              asset.status === 'Active' ? 'bg-emerald-500' : 
-                              asset.status === 'Maintenance' ? 'bg-amber-500' : 'bg-slate-400'
+                              asset.status?.toUpperCase() === 'ACTIVE' ? 'bg-emerald-500' : 
+                              asset.status?.toUpperCase() === 'MAINTENANCE' ? 'bg-amber-500' : 
+                              asset.status?.toUpperCase() === 'RETIRED' ? 'bg-slate-400' :
+                              asset.status?.toUpperCase() === 'LOST' ? 'bg-red-500' : 'bg-slate-400'
                           }`}></span>
                           {asset.status}
                       </span>

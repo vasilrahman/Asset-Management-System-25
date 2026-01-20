@@ -16,6 +16,7 @@ import { AdminVerified } from './views/AdminVerified';
 import { AdminComplaints } from './views/AdminComplaints';
 
 import { LayoutDashboard, Package, Users, LogOut, Menu, X, Bell, AlertTriangle, User, Moon, Sun, ChevronDown, QrCode, CheckCircle, MessageSquare } from 'lucide-react';
+import { Toaster } from 'react-hot-toast';
 
 const MainLayout = () => {
     const { currentRoute, navigate, theme, toggleTheme } = useApp();
@@ -301,6 +302,28 @@ const App = () => {
     return (
         <AppProvider>
             <MainLayout />
+            <Toaster 
+                position="top-right"
+                toastOptions={{
+                    duration: 3000,
+                    style: {
+                        background: '#1e293b',
+                        color: '#f1f5f9',
+                    },
+                    success: {
+                        iconTheme: {
+                            primary: '#10b981',
+                            secondary: '#fff',
+                        },
+                    },
+                    error: {
+                        iconTheme: {
+                            primary: '#ef4444',
+                            secondary: '#fff',
+                        },
+                    },
+                }}
+            />
         </AppProvider>
     );
 };

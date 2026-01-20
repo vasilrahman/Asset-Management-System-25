@@ -1,61 +1,202 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, Download, QrCode, Trash2, Edit, Calendar, User, CheckCircle, AlertTriangle, Package, Clock, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Download, QrCode, Trash2, Edit, Calendar, User, CheckCircle, AlertTriangle, Package, Clock, ShieldAlert, RefreshCw } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { jsPDF } from 'jspdf';
 import QRLib from 'qrcode';
+import { fetchAssetById, fetchAssetVerifications, fetchAssetComplaints, deleteAsset as deleteAssetAPI } from '../services/assetService';
+import toast from 'react-hot-toast';
 
 export const AdminAssetDetail = () => {
-  const { assets, currentRoute, navigate, deleteAsset, logs, complaints } = useApp();
+  const { currentRoute, navigate, deleteAsset } = useApp();
   const [asset, setAsset] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'verification' | 'complaints'>('verification');
+  const [verifications, setVerifications] = useState<any[]>([]);
+  const [loadingVerifications, setLoadingVerifications] = useState(false);
+  const [assetComplaints, setAssetComplaints] = useState<any[]>([]);
+  const [loadingComplaints, setLoadingComplaints] = useState(false);
 
   useEffect(() => {
-    if (currentRoute.params?.id) {
-      const found = assets.find(a => a.id === currentRoute.params.id);
-      setAsset(found);
-    }
-  }, [currentRoute, assets]);
+    const loadAsset = async () => {
+      if (currentRoute.params?.id) {
+        setLoading(true);
+        setError(null);
+        try {
+          const data = await fetchAssetById(currentRoute.params.id);
+          setAsset(data);
+        } catch (err: any) {
+          console.error('Failed to fetch asset:', err);
+          setError(err?.response?.data?.message || err?.message || 'Failed to load asset');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    loadAsset();
+  }, [currentRoute.params?.id]);
 
-  if (!asset) return <div className="text-slate-500 dark:text-slate-400">Loading...</div>;
+  // Fetch verifications when verification tab is active
+  useEffect(() => {
+    const loadVerifications = async () => {
+      if (asset && activeTab === 'verification') {
+        setLoadingVerifications(true);
+        try {
+          const data = await fetchAssetVerifications(asset.id);
+          setVerifications(data);
+        } catch (err: any) {
+          console.error('Failed to fetch verifications:', err);
+          setVerifications([]);
+        } finally {
+          setLoadingVerifications(false);
+        }
+      }
+    };
+    loadVerifications();
+  }, [asset?.id, activeTab]);
 
-  const handleDelete = () => {
-      deleteAsset(asset.id);
-      setShowDeleteModal(false);
-      navigate('/assets');
+  // Fetch complaints when complaints tab is active
+  useEffect(() => {
+    const loadComplaints = async () => {
+      if (asset && activeTab === 'complaints') {
+        setLoadingComplaints(true);
+        try {
+          const data = await fetchAssetComplaints(asset.id);
+          setAssetComplaints(data);
+        } catch (err: any) {
+          console.error('Failed to fetch complaints:', err);
+          setAssetComplaints([]);
+        } finally {
+          setLoadingComplaints(false);
+        }
+      }
+    };
+    loadComplaints();
+  }, [asset?.id, activeTab]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <RefreshCw size={48} className="mb-4 opacity-20 animate-spin" />
+        <p>Loading asset details...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <AlertTriangle size={48} className="mb-4 opacity-20 text-red-400" />
+        <p className="text-red-600 dark:text-red-400">{error}</p>
+        <button onClick={() => navigate('/assets')} className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Back to Assets</button>
+      </div>
+    );
+  }
+
+  if (!asset) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <Package size={48} className="mb-4 opacity-20" />
+        <p>Asset not found</p>
+        <button onClick={() => navigate('/assets')} className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Back to Assets</button>
+      </div>
+    );
+  }
+
+  const handleDelete = async () => {
+      setIsDeleting(true);
+      try {
+        await deleteAssetAPI(asset.id);
+        
+        // Update local context
+        deleteAsset(asset.id);
+        
+        toast.success('Asset deleted successfully');
+        navigate('/assets');
+      } catch (error) {
+        console.error('Failed to delete asset:', error);
+        toast.error('Failed to delete asset. Please try again.');
+      } finally {
+        setIsDeleting(false);
+        setShowDeleteModal(false);
+      }
   };
 
   const handleDownloadPDF = async () => {
-    const doc = new jsPDF();
-    doc.setFillColor(79, 70, 229);
-    doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.text("AMS Asset Card", 20, 25);
-    
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
-    let y = 60;
-    doc.text(`ID: ${asset.id}`, 20, y); y+=10;
-    doc.text(`Name: ${asset.name}`, 20, y); y+=10;
-    doc.text(`Serial: ${asset.serialNumber}`, 20, y); y+=10;
-    
     try {
-        const qrDataUrl = await QRLib.toDataURL(
-            JSON.stringify({ assetId: asset.id, url: `${window.location.origin}/assets/detail?id=${asset.id}` }), 
-            { width: 600, margin: 2, errorCorrectionLevel: 'H' }
-        );
-        doc.addImage(qrDataUrl, 'PNG', 130, 50, 60, 60);
-    } catch(e) {
-        console.error("PDF QR Error", e);
+      console.log('Starting PDF generation for asset:', asset);
+      
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFillColor(79, 70, 229);
+      doc.rect(0, 0, 210, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.text("AMS Asset Card", 20, 25);
+      doc.setFontSize(10);
+      doc.text("Property of Asset Management System Corp.", 20, 32);
+      
+      // Content
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(12);
+      
+      let y = 60;
+      const addLine = (label: string, value: any) => {
+          doc.setFont("helvetica", "bold");
+          doc.text(label, 20, y);
+          doc.setFont("helvetica", "normal");
+          // Convert to string and handle objects/undefined
+          const textValue = value != null ? String(value) : 'N/A';
+          doc.text(textValue, 70, y);
+          y += 10;
+      };
+
+      addLine("Asset ID:", asset.id);
+      addLine("Name:", asset.assetName || asset.name);
+      addLine("Category:", asset.category);
+      addLine("Serial Number:", asset.serialNumber);
+      addLine("Status:", asset.status);
+      addLine("Added By:", asset.addedBy || asset.createdBy || 'System');
+      addLine("Created Date:", asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : 'N/A');
+      
+      console.log('Asset details added to PDF');
+      
+      // QR Code
+      try {
+          const qrDataUrl = await QRLib.toDataURL(
+              JSON.stringify({ assetId: asset.id, url: `${window.location.origin}/assets/detail?id=${asset.id}` }), 
+              { width: 600, margin: 2, errorCorrectionLevel: 'H' }
+          );
+          doc.addImage(qrDataUrl, 'PNG', 130, 50, 60, 60);
+          doc.setFontSize(10);
+          doc.text("Scan to open asset", 160, 115, { align: "center" });
+          console.log('QR code added to PDF');
+      } catch(e) {
+          console.error("PDF QR Error", e);
+          doc.text("QR Generation Failed", 130, 80);
+      }
+      
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Generated on ${new Date().toLocaleString()}`, 20, 280);
+
+      const assetName = (asset.assetName || asset.name || 'Asset').replace(/\s+/g, '_');
+      const fileName = `${assetName}_${asset.id.slice(0, 8)}.pdf`;
+      console.log('Saving PDF as:', fileName);
+      doc.save(fileName);
+      
+      toast.success('PDF downloaded successfully');
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      toast.error('Failed to generate PDF. Please try again.');
     }
-
-    doc.save(`QR_${asset.id}.pdf`);
   };
-
-  const assetComplaints = complaints.filter(c => c.assetId === asset.id);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20 relative">
@@ -150,9 +291,14 @@ export const AdminAssetDetail = () => {
                    <div className="p-6 min-h-[200px]">
                        {activeTab === 'verification' && (
                            <>
-                            {logs.filter(l => l.assetId === asset.id).length > 0 ? (
+                            {loadingVerifications ? (
+                                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                    <RefreshCw size={32} className="mb-2 opacity-20 animate-spin" />
+                                    <p className="text-sm">Loading verifications...</p>
+                                </div>
+                            ) : verifications.length > 0 ? (
                                 <div className="space-y-4">
-                                    {logs.filter(l => l.assetId === asset.id).map(log => (
+                                    {verifications.map(log => (
                                         <div key={log.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-emerald-500 shadow-sm">
@@ -160,7 +306,7 @@ export const AdminAssetDetail = () => {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-slate-700 dark:text-slate-200 text-sm">Verified by {log.verifiedBy}</p>
-                                                    <p className="text-xs text-slate-400">{new Date(log.timestamp).toLocaleString()}</p>
+                                                    <p className="text-xs text-slate-400">{new Date(log.timestamp || log.verifiedAt || log.date).toLocaleString()}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -169,7 +315,7 @@ export const AdminAssetDetail = () => {
                             ) : (
                                 <div className="text-center py-8 text-slate-400">
                                     <Clock className="mx-auto mb-2 opacity-30" size={32}/>
-                                    <p>No verification history found.</p>
+                                    <p>No verification history</p>
                                 </div>
                             )}
                            </>
@@ -177,13 +323,18 @@ export const AdminAssetDetail = () => {
 
                        {activeTab === 'complaints' && (
                            <>
-                                {assetComplaints.length > 0 ? (
+                                {loadingComplaints ? (
+                                    <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                        <RefreshCw size={32} className="mb-2 opacity-20 animate-spin" />
+                                        <p className="text-sm">Loading complaints...</p>
+                                    </div>
+                                ) : assetComplaints.length > 0 ? (
                                     <div className="space-y-4">
                                         {assetComplaints.map(comp => (
                                             <div key={comp.id} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-700">
                                                 <div className="flex justify-between mb-2">
-                                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${comp.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{comp.status}</span>
-                                                    <span className="text-xs text-slate-400">{new Date(comp.date).toLocaleDateString()}</span>
+                                                    <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${comp.status === 'Pending' || comp.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{comp.status}</span>
+                                                    <span className="text-xs text-slate-400">{new Date(comp.date || comp.createdAt || comp.timestamp).toLocaleDateString()}</span>
                                                 </div>
                                                 <p className="text-sm text-slate-700 dark:text-slate-300 font-medium mb-1">{comp.description}</p>
                                                 <p className="text-xs text-slate-500">Reported by {comp.reportedBy}</p>
@@ -229,11 +380,9 @@ export const AdminAssetDetail = () => {
                    </div>
                    <p className="text-xs text-slate-400">Scan to view or verify this asset.</p>
                    
-                   {asset.isQrGenerated && (
-                        <button onClick={handleDownloadPDF} className="mt-4 text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center gap-1 hover:underline">
-                            <Download size={14}/> Download PDF
-                        </button>
-                   )}
+                   <button onClick={handleDownloadPDF} className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 flex items-center gap-2 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none">
+                        <Download size={16}/> Download PDF
+                   </button>
                </div>
           </div>
       </div>
@@ -249,11 +398,18 @@ export const AdminAssetDetail = () => {
                   <h3 className="text-xl font-bold text-center text-slate-800 dark:text-white mb-2">Delete Asset?</h3>
                   <p className="text-center text-slate-500 dark:text-slate-400 mb-8">This action cannot be undone. This asset and all its history will be permanently removed.</p>
                   <div className="flex gap-3">
-                      <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
+                      <button onClick={() => setShowDeleteModal(false)} disabled={isDeleting} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                           Cancel
                       </button>
-                      <button onClick={handleDelete} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
-                          Yes, Delete
+                      <button onClick={handleDelete} disabled={isDeleting} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                          {isDeleting ? (
+                            <>
+                              <RefreshCw size={16} className="animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            'Yes, Delete'
+                          )}
                       </button>
                   </div>
               </div>
