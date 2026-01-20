@@ -42,6 +42,67 @@ export const fetchAssets = async (params: FetchAssetsParams): Promise<FetchAsset
   return response.data;
 };
 
+export const fetchAssetById = async (assetId: string): Promise<any> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/admin/assets/${assetId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
+export const fetchAssetVerifications = async (assetId: string): Promise<any[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/admin/assets/${assetId}/verifications`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else {
+    return [];
+  }
+};
+
+export const fetchAssetComplaints = async (assetId: string): Promise<any[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/admin/assets/${assetId}/complaints`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  // Handle different response structures
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  } else if (data && Array.isArray(data.data)) {
+    return data.data;
+  } else {
+    return [];
+  }
+};
+
 export const fetchStaffAssets = async (): Promise<any[]> => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
@@ -146,4 +207,58 @@ export const submitStaffComplaint = async (data: {
 
   console.log('Response:', response.data);
   return response.data;
+};
+
+export const updateAsset = async (assetId: string, data: any): Promise<any> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.put(
+    `${API_BASE_URL}/admin/assets/${assetId}`,
+    data,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return response.data;
+};
+
+export const regenerateAssetQR = async (assetId: string): Promise<any> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.post(
+    `${API_BASE_URL}/admin/assets/${assetId}/regenerate-qr`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  return response.data;
+};
+
+export const deleteAsset = async (assetId: string): Promise<void> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  await axios.delete(
+    `${API_BASE_URL}/admin/assets/${assetId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 };
