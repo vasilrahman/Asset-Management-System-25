@@ -42,6 +42,51 @@ export const fetchAssets = async (params: FetchAssetsParams): Promise<FetchAsset
   return response.data;
 };
 
+export const fetchStaffAssets = async (): Promise<any[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/staff/assets`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
+export const fetchStaffVerifiedHistory = async (): Promise<any[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/staff/history/verified`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
+export const fetchStaffComplaintsHistory = async (): Promise<any[]> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const response = await axios.get(`${API_BASE_URL}/staff/history/complaints`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
 export const verifyStaffAsset = async (assetId: string): Promise<void> => {
   console.log('verifyStaffAsset called with:', assetId);
   console.log('API_BASE_URL:', API_BASE_URL);
