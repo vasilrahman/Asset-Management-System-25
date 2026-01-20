@@ -7,6 +7,7 @@ import { CustomSelect } from '../components/CustomSelect';
 import jsQR from 'jsqr';
 import { StaffRegisterAsset } from './StaffRegisterAsset';
 import { verifyQRCode } from '../services/dashboardService';
+import { verifyStaffAsset, submitStaffComplaint } from '../services/assetService';
 
 type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM' | 'REGISTER_ASSET';
 
@@ -43,6 +44,7 @@ export const StaffModule = () => {
     // Scanner Mode: 'VERIFY' or 'REGISTER'
     const [scannerMode, setScannerMode] = useState<'VERIFY' | 'REGISTER'>('VERIFY');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+    const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
 
     // Show toast message
     const showToast = (message: string, type: 'success' | 'error' | 'warning') => {
@@ -91,29 +93,70 @@ export const StaffModule = () => {
         }
     };
 
-    const handleVerify = () => {
-        if (selectedAsset && currentUser) {
-            verifyAsset(selectedAsset.id, currentUser.name);
-            setView('HOME');
+    const handleVerify = async () => {
+        console.log('handleVerify called', { selectedAsset, currentUser });
+        if (selectedAsset) {
+            try {
+                console.log('Calling verifyStaffAsset with:', selectedAsset.id);
+                await verifyStaffAsset(selectedAsset.id);
+                console.log('verifyStaffAsset successful');
+                if (currentUser) {
+                    verifyAsset(selectedAsset.id, currentUser.name);
+                }
+                showToast('Asset verified successfully', 'success');
+                setView('HOME');
+            } catch (error: any) {
+                console.error('Failed to verify asset:', error);
+                const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify asset';
+                showToast(errorMessage, 'error');
+            }
+        } else {
+            console.log('Missing selectedAsset');
         }
     };
 
-    const handleComplaintSubmit = (e: React.FormEvent) => {
+    const handleComplaintSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (selectedAsset && currentUser) {
-            addComplaint({
-                id: `c-${Date.now()}`,
-                assetId: selectedAsset.id,
-                assetName: selectedAsset.name,
-                reportedBy: currentUser.name,
-                date: new Date().toISOString(),
-                description: complaintText,
-                status: 'Pending',
-                imageUrl: complaintImage
-            });
-            setComplaintText('');
-            setComplaintImage('');
-            setView('HOME');
+        console.log('handleComplaintSubmit called', { selectedAsset, currentUser });
+        if (selectedAsset) {
+            setIsSubmittingComplaint(true);
+            try {
+                console.log('Calling submitStaffComplaint with:', {
+                    assetId: selectedAsset.id,
+                    description: complaintText,
+                    imageUrl: complaintImage || undefined
+                });
+                await submitStaffComplaint({
+                    assetId: selectedAsset.id,
+                    description: complaintText,
+                    imageUrl: complaintImage || undefined
+                });
+                console.log('submitStaffComplaint successful');
+                if (currentUser) {
+                    addComplaint({
+                        id: `c-${Date.now()}`,
+                        assetId: selectedAsset.id,
+                        assetName: selectedAsset.name,
+                        reportedBy: currentUser.name,
+                        date: new Date().toISOString(),
+                        description: complaintText,
+                        status: 'Pending',
+                        imageUrl: complaintImage
+                    });
+                }
+                setComplaintText('');
+                setComplaintImage('');
+                showToast('Issue reported successfully', 'success');
+                setView('HOME');
+            } catch (error: any) {
+                console.error('Failed to submit complaint:', error);
+                const errorMessage = error?.response?.data?.message || error?.message || 'Failed to report issue';
+                showToast(errorMessage, 'error');
+            } finally {
+                setIsSubmittingComplaint(false);
+            }
+        } else {
+            console.log('Missing selectedAsset');
         }
     };
 
@@ -771,7 +814,13 @@ export const StaffModule = () => {
                         <input type="file" accept="image/*" className="hidden" onChange={handleComplaintImageUpload} />
                     </label>
 
-                    <button type="submit" className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-slate-200 dark:shadow-indigo-900/30 mt-auto">Submit Report</button>
+                    <button 
+                        type="submit" 
+                        disabled={isSubmittingComplaint}
+                        className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-slate-200 dark:shadow-indigo-900/30 mt-auto disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    >
+                        {isSubmittingComplaint ? 'Submitting...' : 'Submit Report'}
+                    </button>
                 </form>
             </div>
         );
