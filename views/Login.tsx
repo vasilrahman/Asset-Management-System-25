@@ -36,7 +36,7 @@ export const Login = () => {
       {/* Left Side - Image */}
       <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-slate-900">
         <img 
-            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" 
+            // src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" 
             alt="Architecture" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
         />
