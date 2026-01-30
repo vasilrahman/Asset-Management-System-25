@@ -10,6 +10,7 @@ export type Theme = 'light' | 'dark';
 export interface User {
   id: string;
   name: string;
+  fullName: string;
   username: string;
   password: string; // In real app, never store plain text
   role: Role;

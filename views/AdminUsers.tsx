@@ -6,6 +6,10 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { Mail, Phone, MoreHorizontal, Plus, Edit, Trash2, AlertTriangle, User as UserIcon } from 'lucide-react';
 
+const getDisplayName = (user: User): string => {
+  return user.fullName || user.username || user.email.split('@')[0];
+};
+
 export const AdminUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,7 +160,7 @@ export const AdminUsers = () => {
                        <div className="flex items-center gap-4">
                            <div className="relative">
                                {user.avatarUrl ? (
-                                   <img src={user.avatarUrl} className={`w-14 h-14 rounded-2xl object-cover shadow-sm ${!user.isActive && 'grayscale opacity-70'}`} alt={user.name} />
+                                   <img src={user.avatarUrl} className={`w-14 h-14 rounded-2xl object-cover shadow-sm ${!user.isActive && 'grayscale opacity-70'}`} alt={getDisplayName(user)} />
                                ) : (
                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 shadow-sm ${!user.isActive && 'opacity-70'}`}>
                                        <UserIcon size={24} />
@@ -165,7 +169,7 @@ export const AdminUsers = () => {
                                <span className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-white dark:border-slate-800 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
                            </div>
                            <div>
-                               <h3 className={`font-bold text-lg ${user.isActive ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-500'}`}>{user.name}</h3>
+                               <h3 className={`font-bold text-lg ${user.isActive ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-500'}`}>{getDisplayName(user)}</h3>
                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{user.designation}</p>
                            </div>
                        </div>
@@ -246,7 +250,7 @@ export const AdminUsers = () => {
                       <AlertTriangle size={32} />
                   </div>
                   <h3 className="text-xl font-bold text-center text-slate-800 dark:text-white mb-2">Remove User?</h3>
-                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to remove <span className="font-semibold text-slate-800 dark:text-slate-200">{userToDelete.name}</span>? This action cannot be undone.</p>
+                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to remove <span className="font-semibold text-slate-800 dark:text-slate-200">{getDisplayName(userToDelete)}</span>? This action cannot be undone.</p>
                   <div className="flex gap-3">
                       <button onClick={() => setUserToDelete(null)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
                           Cancel
@@ -268,7 +272,7 @@ export const AdminUsers = () => {
                       <AlertTriangle size={32} />
                   </div>
                   <h3 className="text-xl font-bold text-center text-slate-800 dark:text-white mb-2">Disable User?</h3>
-                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to disable <span className="font-semibold text-slate-800 dark:text-slate-200">{userToToggle.name}</span>? They will lose access to the system.</p>
+                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to disable <span className="font-semibold text-slate-800 dark:text-slate-200">{getDisplayName(userToToggle)}</span>? They will lose access to the system.</p>
                   <div className="flex gap-3">
                       <button onClick={() => setUserToToggle(null)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
                           Cancel
