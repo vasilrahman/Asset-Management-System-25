@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Search, ArrowRight, Calendar, ChevronDown, Package, Laptop, Camera, Smartphone, Tablet } from 'lucide-react';
+import { Search, ArrowRight, Calendar, ChevronDown, Package, Laptop, Camera, Smartphone, Tablet, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
-import { fetchAssets } from '../services/assetService';
+import { fetchAssets, fetchAssetsForExport } from '../services/assetService';
 import { Asset } from '../types';
 
 export const AdminAssets = () => {
@@ -17,6 +17,10 @@ export const AdminAssets = () => {
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  
+  // Export
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -45,6 +49,8 @@ export const AdminAssets = () => {
           search: debouncedSearch,
           category: filterCategory,
           status: filterStatus,
+          startDate: dateStart,
+          endDate: dateEnd,
           page: currentPage,
           limit: itemsPerPage,
         });
@@ -61,7 +67,7 @@ export const AdminAssets = () => {
       }
     };
     loadAssets();
-  }, [debouncedSearch, filterCategory, filterStatus, currentPage]);
+  }, [debouncedSearch, filterCategory, filterStatus, dateStart, dateEnd, currentPage]);
 
   const currentAssets = assets;
 
@@ -81,6 +87,123 @@ export const AdminAssets = () => {
       { value: 'Retired', label: 'Retired' },
       { value: 'Lost', label: 'Lost' },
   ];
+
+  const handleExport = async (format: 'excel' | 'pdf') => {
+    setIsExporting(true);
+    setIsExportDropdownOpen(false);
+    
+    try {
+      const response = await fetchAssetsForExport({
+        search: debouncedSearch,
+        category: filterCategory,
+        status: filterStatus,
+        startDate: dateStart,
+        endDate: dateEnd,
+      });
+
+      // Handle different response structures
+      let exportData = response;
+      if (response && typeof response === 'object') {
+        if (Array.isArray(response.data)) {
+          exportData = response.data;
+        } else if (Array.isArray(response)) {
+          exportData = response;
+        }
+      }
+
+      // Validate data is an array
+      if (!Array.isArray(exportData)) {
+        console.error('Invalid export data format:', response);
+        throw new Error('Invalid data format received from server');
+      }
+
+      if (exportData.length === 0) {
+        alert('No data to export');
+        setIsExporting(false);
+        return;
+      }
+
+      if (format === 'excel') {
+        await exportToExcel(exportData);
+      } else {
+        await exportToPDF(exportData);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToExcel = async (data: any[]) => {
+    // Dynamic import to reduce bundle size
+    const XLSX = await import('xlsx');
+    
+    const worksheetData = data.map((asset) => ({
+      'QR Code': asset.qrCode || asset.qrCode === null ? asset.qrCode || 'Not Assigned' : 'Not Assigned',
+      'Asset Name': asset.name || 'N/A',
+      'Category': asset.category || 'N/A',
+      'Serial Number': asset.serialNumber || 'N/A',
+      'Status': asset.status || 'N/A',
+      'Location': asset.location || 'N/A',
+      'Last Verified': asset.lastVerifiedAt ? new Date(asset.lastVerifiedAt).toLocaleDateString() : 'Never',
+      'Created Date': asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : 'N/A',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
+    
+    // Auto-size columns
+    const maxWidth = 30;
+    const colWidths = Object.keys(worksheetData[0] || {}).map(key => ({
+      wch: Math.min(Math.max(key.length, 10), maxWidth)
+    }));
+    worksheet['!cols'] = colWidths;
+
+    const fileName = `assets-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const exportToPDF = async (data: any[]) => {
+    // Dynamic import to reduce bundle size
+    const { jsPDF } = await import('jspdf');
+    const autoTable = (await import('jspdf-autotable')).default;
+    
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(18);
+    doc.text('Asset Management Report', 14, 20);
+    
+    // Export date
+    doc.setFontSize(10);
+    doc.text(`Exported on: ${new Date().toLocaleString()}`, 14, 28);
+    
+    // Table
+    const tableData = data.map((asset) => [
+      asset.qrCode || 'Not Assigned',
+      asset.name || 'N/A',
+      asset.category || 'N/A',
+      asset.serialNumber || 'N/A',
+      asset.status || 'N/A',
+      asset.location || 'N/A',
+      asset.lastVerifiedAt ? new Date(asset.lastVerifiedAt).toLocaleDateString() : 'Never',
+    ]);
+
+    autoTable(doc, {
+      head: [['QR Code', 'Name', 'Category', 'Serial', 'Status', 'Location', 'Last Verified']],
+      body: tableData,
+      startY: 35,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229], textColor: 255 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    const fileName = `assets-export-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  };
 
   return (
     <div className="space-y-6">
@@ -160,7 +283,42 @@ export const AdminAssets = () => {
                     {isDateDropdownOpen && <div className="fixed inset-0 z-10" onClick={() => setIsDateDropdownOpen(false)}></div>}
                 </div>
             </div>
-        </div>
+
+            {/* Export Button */}
+            <div className="relative">
+              <button
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                disabled={isExporting}
+                className={`flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition-all ${
+                  isExporting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Download size={18} />
+                {isExporting ? 'Exporting...' : 'Export'}
+                {!isExporting && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
+              </button>
+
+              {isExportDropdownOpen && !isExporting && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
+                  <button
+                    onClick={() => handleExport('excel')}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors"
+                  >
+                    <FileSpreadsheet size={16} />
+                    Export as Excel
+                  </button>
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
+                  >
+                    <FileText size={16} />
+                    Export as PDF
+                  </button>
+                </div>
+              )}
+              {isExportDropdownOpen && !isExporting && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
+            </div>
+          </div>
       </div>
 
       {/* Asset Grid/Table */}
@@ -205,7 +363,9 @@ export const AdminAssets = () => {
                   {/* Asset Name - Updated ID format - REMOVED font-mono */}
                   <div className="col-span-3 w-full text-center md:text-left">
                       <h4 className="font-semibold text-slate-800 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{asset.name}</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">ID: {asset.id}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        QR: {asset.qrCode || 'Not Assigned'}
+                      </p>
                   </div>
                   
                   {/* Category */}

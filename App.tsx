@@ -99,6 +99,7 @@ const MainLayout = () => {
 
     const renderContent = () => {
         if (currentRoute.path === '/assets/edit') return <AdminAssetForm />;
+        if (currentRoute.path.startsWith('/users/edit/')) return <AdminUserForm />;
         if (currentRoute.path === '/users/edit') return <AdminUserForm />;
 
         switch (currentRoute.path) {
