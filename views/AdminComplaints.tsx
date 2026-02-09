@@ -234,50 +234,49 @@ export const AdminComplaints = () => {
                         </div>
                     ) : (
                         complaints.map(complaint => (
-                            <div key={complaint.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-6 transition-colors duration-200">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${complaint.status === 'Pending'
+                            <div key={complaint.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-start justify-between gap-6 transition-colors duration-200">
+                                <div className="flex-1 space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${complaint.status === 'Pending'
                                                 ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'
                                                 : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
                                             }`}>
                                             {complaint.status}
                                         </span>
-                                        <span className="text-sm text-slate-400 dark:text-slate-500">{new Date(complaint.date || complaint.timestamp || '').toLocaleString()}</span>
+                                        <span className="text-sm text-slate-400 dark:text-slate-500">{new Date(complaint.date || complaint.timestamp || '').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) + ', ' + new Date(complaint.date || complaint.timestamp || '').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}</span>
                                     </div>
-                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{complaint.assetName} <span className="text-slate-400 font-normal text-sm">({complaint.assetId})</span></h3>
-                                    <p className="text-slate-600 dark:text-slate-300 mt-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl">{complaint.description}</p>
-                                    {complaint.imageUrl && (
-                                        <div className="mt-3">
-                                            <p className="text-xs font-semibold text-slate-500 mb-1">Attached Evidence:</p>
-                                            <img src={complaint.imageUrl} alt="Evidence" className="h-32 rounded-lg border border-slate-200 dark:border-slate-700 object-cover hover:scale-105 transition-transform cursor-pointer" />
-                                        </div>
-                                    )}
-                                    <div className="mt-4 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                                        <span className="font-medium text-slate-700 dark:text-slate-300">Reported by:</span> {complaint.reportedBy}
+                                    <h3 className="text-2xl font-bold text-slate-800 dark:text-white">
+                                        {complaint.assetName} <span className="text-slate-400 dark:text-slate-500 font-normal text-base">({complaint.assetId})</span>
+                                    </h3>
+                                    <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed pl-4 border-l-2 border-slate-200 dark:border-slate-700">
+                                        {complaint.description}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 pt-2">
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">Reported by:</span>
+                                        <span>{complaint.reportedBy}</span>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-2 justify-center border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-700 pt-4 md:pt-0 md:pl-6 min-w-[140px]">
+                                <div className="flex flex-col gap-3 min-w-[140px]">
                                     {complaint.status === 'Pending' ? (
                                         <button 
                                             onClick={() => resolveComplaint(complaint.id)}
                                             disabled={resolvingId === complaint.id}
-                                            className={`flex items-center justify-center gap-2 py-2 px-4 rounded-xl font-medium shadow-sm transition-colors text-sm ${
+                                            className={`flex items-center justify-center gap-2 py-2.5 px-5 rounded-xl font-semibold shadow-sm transition-colors text-sm ${
                                                 resolvingId === complaint.id
                                                     ? 'bg-indigo-400 cursor-not-allowed text-white'
                                                     : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                                             }`}
                                         >
-                                            <CheckCircle size={16} />
+                                            <CheckCircle size={18} />
                                             {resolvingId === complaint.id ? 'Resolving...' : 'Resolve'}
                                         </button>
                                     ) : (
-                                        <button disabled className="flex items-center justify-center gap-2 bg-emerald-600 text-white py-2 px-4 rounded-xl font-medium shadow-sm text-sm cursor-not-allowed opacity-75">
-                                            <CheckCircle size={16} /> Resolved
+                                        <button disabled className="flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 px-5 rounded-xl font-semibold shadow-sm text-sm cursor-not-allowed opacity-75">
+                                            <CheckCircle size={18} /> Resolved
                                         </button>
                                     )}
-                                    <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 py-2 px-4 rounded-xl font-medium transition-colors text-sm">
+                                    <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 py-2.5 px-5 rounded-xl font-semibold transition-colors text-sm">
                                         View Details
                                     </button>
                                 </div>
