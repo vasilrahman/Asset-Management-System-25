@@ -10,7 +10,8 @@ export const AdminUserForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
-  const { navigate } = useApp();
+  const [loadingUser, setLoadingUser] = useState(false);
+  const { navigate, currentRoute } = useApp();
   
   // User State - removed random avatarUrl default
   const [userData, setUserData] = useState<Partial<User>>({
@@ -19,11 +20,64 @@ export const AdminUserForm = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Check if we are in Edit mode (for future implementation)
+  // Check if we are in Edit mode and load user data
   useEffect(() => {
-    // For now, this is always add mode
-    setEditUserId(null);
-  }, []);
+    const pathParts = currentRoute.path.split('/');
+    const userId = pathParts[pathParts.length - 1];
+    
+    if (currentRoute.path.includes('/users/edit/') && userId) {
+      setEditUserId(userId);
+      loadUserData(userId);
+    } else {
+      setEditUserId(null);
+    }
+  }, [currentRoute]);
+
+  const loadUserData = async (userId: string) => {
+    setLoadingUser(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      const response = await fetch(`${apiBaseUrl}/admin/users`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+
+      const users = await response.json();
+      const user = users.find((u: any) => u.id === userId);
+      
+      if (user) {
+        setUserData({
+          name: user.fullName || '',
+          username: user.username || '',
+          password: '', // Don't load password
+          email: user.email || '',
+          phone: user.phone || '',
+          designation: user.designation || '',
+          role: user.role || 'STAFF',
+          isActive: user.isActive ?? true,
+          avatarUrl: user.avatarUrl || ''
+        });
+      } else {
+        throw new Error('User not found');
+      }
+    } catch (err) {
+      console.error('Failed to load user:', err);
+      setErrors({ submit: 'Failed to load user data' });
+    } finally {
+      setLoadingUser(false);
+    }
+  };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -64,36 +118,55 @@ export const AdminUserForm = () => {
       }
 
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-      const response = await fetch(`${apiBaseUrl}/admin/users`, {
-        method: 'POST',
+      
+      const requestBody: any = {
+        fullName: userData.name,
+        username: userData.username,
+        email: userData.email,
+        phone: userData.phone,
+        designation: userData.designation,
+        role: userData.role,
+        isActive: userData.isActive,
+      };
+
+      // Only include password if it's provided
+      if (userData.password) {
+        requestBody.password = userData.password;
+      }
+
+      const url = editUserId 
+        ? `${apiBaseUrl}/admin/users/${editUserId}`
+        : `${apiBaseUrl}/admin/users`;
+      
+      const method = editUserId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          fullName: userData.name,
-          username: userData.username,
-          password: userData.password,
-          email: userData.email,
-          phone: userData.phone,
-          designation: userData.designation,
-          role: userData.role,
-          isActive: userData.isActive,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create user');
+        if (response.status === 409) {
+          // Duplicate username or email
+          throw new Error(errorData.message || 'Username or Email already exists');
+        }
+        throw new Error(errorData.message || `Failed to ${editUserId ? 'update' : 'create'} user`);
       }
 
       // Show success toast
       setShowSuccessToast(true);
       
-      // Reset form
-      setUserData({
-        name: '', username: '', password: '', email: '', phone: '', designation: '', role: 'STAFF', isActive: true, avatarUrl: ''
-      });
+      if (!editUserId) {
+        // Reset form for new user
+        setUserData({
+          name: '', username: '', password: '', email: '', phone: '', designation: '', role: 'STAFF', isActive: true, avatarUrl: ''
+        });
+      }
       setErrors({});
 
       // Redirect after a short delay
@@ -103,8 +176,8 @@ export const AdminUserForm = () => {
       }, 2000);
 
     } catch (err) {
-      console.error('Failed to create user:', err);
-      setErrors({ submit: err instanceof Error ? err.message : 'Failed to create user' });
+      console.error(`Failed to ${editUserId ? 'update' : 'create'} user:`, err);
+      setErrors({ submit: err instanceof Error ? err.message : `Failed to ${editUserId ? 'update' : 'create'} user` });
     } finally {
       setIsSubmitting(false);
     }
@@ -121,19 +194,28 @@ export const AdminUserForm = () => {
        {showSuccessToast && (
          <div className="fixed top-4 right-4 z-50 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
            <CheckCircle size={20} />
-           <span className="font-medium">User created successfully!</span>
+           <span className="font-medium">User {editUserId ? 'updated' : 'created'} successfully!</span>
          </div>
        )}
 
-       <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/users')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
-                <ArrowLeft size={24} />
-            </button>
-            <div>
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{editUserId ? 'Edit User' : 'Add New User'}</h1>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">{editUserId ? 'Update user details and permissions.' : 'Create a new account for a staff member or admin.'}</p>
-            </div>
-       </div>
+       {/* Loading State */}
+       {loadingUser && (
+         <div className="bg-white dark:bg-slate-800 p-12 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm text-center transition-colors duration-200">
+           <div className="text-lg text-slate-600 dark:text-slate-400">Loading user data...</div>
+         </div>
+       )}
+
+       {!loadingUser && (
+         <>
+           <div className="flex items-center gap-4">
+                <button onClick={() => navigate('/users')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
+                    <ArrowLeft size={24} />
+                </button>
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{editUserId ? 'Edit User' : 'Add New User'}</h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">{editUserId ? 'Update user details and permissions.' : 'Create a new account for a staff member or admin.'}</p>
+                </div>
+           </div>
 
        <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 p-8 space-y-8 overflow-visible">
            <div className="space-y-6">
@@ -230,7 +312,9 @@ export const AdminUserForm = () => {
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">Password</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">
+                          Password {editUserId && <span className="text-xs text-slate-400">(leave empty to keep current)</span>}
+                        </label>
                         <div className="relative">
                             <input 
                                 type={showPassword ? 'text' : 'password'}
@@ -240,7 +324,7 @@ export const AdminUserForm = () => {
                                 className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 pr-12 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
                                   errors.password ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
                                 }`} 
-                                placeholder="••••••••"
+                                placeholder={editUserId ? "Enter new password to change" : "••••••••"}
                             />
                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -257,17 +341,6 @@ export const AdminUserForm = () => {
                             options={roleOptions} 
                         />
                     </div>
-
-                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <div>
-                            <span className="font-bold text-slate-800 dark:text-white block">Account Status</span>
-                            <span className="text-xs text-slate-400 dark:text-slate-500">Enable or disable login access</span>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" className="sr-only peer" checked={userData.isActive} onChange={() => setUserData({...userData, isActive: !userData.isActive})} />
-                            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-100 dark:peer-focus:ring-indigo-900 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                        </label>
-                    </div>
                 </div>
            </div>
 
@@ -277,7 +350,7 @@ export const AdminUserForm = () => {
                    {errors.submit}
                  </div>
                )}
-               <button type="button" onClick={() => {/* navigate('/users') */}} className="px-6 py-3 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
+               <button type="button" onClick={() => navigate('/users')} className="px-6 py-3 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
                    Cancel
                </button>
                <button 
@@ -289,10 +362,12 @@ export const AdminUserForm = () => {
                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
                  }`}
                >
-                 {isSubmitting ? 'Creating User...' : (editUserId ? 'Update User' : 'Create User')}
+                 {isSubmitting ? (editUserId ? 'Updating User...' : 'Creating User...') : (editUserId ? 'Update User' : 'Create User')}
                </button>
            </div>
        </form>
+         </>
+       )}
     </div>
   );
 };

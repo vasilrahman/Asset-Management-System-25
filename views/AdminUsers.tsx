@@ -6,6 +6,10 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { Mail, Phone, MoreHorizontal, Plus, Edit, Trash2, AlertTriangle, User as UserIcon } from 'lucide-react';
 
+const getDisplayName = (user: User): string => {
+  return user.fullName || user.username || user.email.split('@')[0];
+};
+
 export const AdminUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +102,7 @@ export const AdminUsers = () => {
 
   const handleEdit = (userId: string) => {
     setActiveDropdown(null);
-    // navigate('/users/edit', { id: userId }); // TODO: Implement navigation
+    navigate(`/users/edit/${userId}`);
   };
 
   const handleDeleteClick = (user: User) => {
@@ -106,9 +110,40 @@ export const AdminUsers = () => {
     setUserToDelete(user);
   };
 
-  const confirmDelete = () => {
-    if (userToDelete) {
-      // deleteUser(userToDelete.id); // TODO: Implement delete API
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      const response = await fetch(`${apiBaseUrl}/admin/users/${userToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 400) {
+          alert(errorData.message || 'Cannot delete the last admin user');
+        } else {
+          throw new Error(errorData.message || 'Failed to delete user');
+        }
+        setUserToDelete(null);
+        return;
+      }
+
+      // Remove user from local state
+      setUsers(prevUsers => prevUsers.filter(u => u.id !== userToDelete.id));
+      setUserToDelete(null);
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      alert(err instanceof Error ? err.message : 'Failed to delete user');
       setUserToDelete(null);
     }
   };
@@ -153,20 +188,20 @@ export const AdminUsers = () => {
                    <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${user.isActive ? 'from-indigo-500 via-purple-500 to-pink-500' : 'from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700'} opacity-0 group-hover:opacity-100 transition-opacity rounded-t-3xl`}></div>
                    
                    <div className="flex justify-between items-start mb-6">
-                       <div className="flex items-center gap-4">
+                       <div className="flex items-center gap-4 flex-1">
                            <div className="relative">
                                {user.avatarUrl ? (
-                                   <img src={user.avatarUrl} className={`w-14 h-14 rounded-2xl object-cover shadow-sm ${!user.isActive && 'grayscale opacity-70'}`} alt={user.name} />
+                                   <img src={user.avatarUrl} className={`w-16 h-16 rounded-2xl object-cover shadow-sm ${!user.isActive && 'grayscale opacity-70'}`} alt={getDisplayName(user)} />
                                ) : (
-                                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 shadow-sm ${!user.isActive && 'opacity-70'}`}>
-                                       <UserIcon size={24} />
+                                   <div className={`w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-sm ${!user.isActive && 'opacity-70 grayscale'}`}>
+                                       <span className="text-2xl font-bold">{getDisplayName(user).charAt(0).toUpperCase()}</span>
                                    </div>
                                )}
                                <span className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-white dark:border-slate-800 rounded-full ${user.isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
                            </div>
-                           <div>
-                               <h3 className={`font-bold text-lg ${user.isActive ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-500'}`}>{user.name}</h3>
-                               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{user.designation}</p>
+                           <div className="flex-1 min-w-0">
+                               <h3 className={`font-bold text-xl mb-1 ${user.isActive ? 'text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-500'}`}>{getDisplayName(user)}</h3>
+                               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{user.designation || 'No designation'}</p>
                            </div>
                        </div>
                        
@@ -246,7 +281,7 @@ export const AdminUsers = () => {
                       <AlertTriangle size={32} />
                   </div>
                   <h3 className="text-xl font-bold text-center text-slate-800 dark:text-white mb-2">Remove User?</h3>
-                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to remove <span className="font-semibold text-slate-800 dark:text-slate-200">{userToDelete.name}</span>? This action cannot be undone.</p>
+                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to remove <span className="font-semibold text-slate-800 dark:text-slate-200">{getDisplayName(userToDelete)}</span>? This action cannot be undone.</p>
                   <div className="flex gap-3">
                       <button onClick={() => setUserToDelete(null)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
                           Cancel
@@ -268,7 +303,7 @@ export const AdminUsers = () => {
                       <AlertTriangle size={32} />
                   </div>
                   <h3 className="text-xl font-bold text-center text-slate-800 dark:text-white mb-2">Disable User?</h3>
-                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to disable <span className="font-semibold text-slate-800 dark:text-slate-200">{userToToggle.name}</span>? They will lose access to the system.</p>
+                  <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to disable <span className="font-semibold text-slate-800 dark:text-slate-200">{getDisplayName(userToToggle)}</span>? They will lose access to the system.</p>
                   <div className="flex gap-3">
                       <button onClick={() => setUserToToggle(null)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
                           Cancel
