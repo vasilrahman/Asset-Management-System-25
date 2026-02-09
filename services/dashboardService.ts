@@ -41,12 +41,25 @@ export const fetchDashboardData = async (): Promise<DashboardData> => {
 export interface FetchVerificationsParams {
   search?: string;
   category?: string;
+  status?: string;
   verifiedBy?: string;
   startDate?: string;
   endDate?: string;
+  page?: number;
+  limit?: number;
 }
 
-export const fetchVerifications = async (params?: FetchVerificationsParams): Promise<VerificationLog[]> => {
+export interface VerificationsResponse {
+  data: VerificationLog[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export const fetchVerifications = async (params?: FetchVerificationsParams): Promise<VerificationsResponse> => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
     throw new Error('No access token found');
@@ -54,10 +67,13 @@ export const fetchVerifications = async (params?: FetchVerificationsParams): Pro
 
   const queryParams = new URLSearchParams();
   if (params?.search) queryParams.append('search', params.search);
-  if (params?.category && params.category !== 'All') queryParams.append('category', params.category);
+  if (params?.category && params.category !== 'All') queryParams.append('category', params.category.toUpperCase());
+  if (params?.status && params.status !== 'All') queryParams.append('status', params.status.toUpperCase());
   if (params?.verifiedBy && params.verifiedBy !== 'All') queryParams.append('verifiedBy', params.verifiedBy);
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
 
   const queryString = queryParams.toString();
   const url = queryString ? `${API_BASE_URL}/admin/verifications?${queryString}` : `${API_BASE_URL}/admin/verifications`;
@@ -70,22 +86,104 @@ export const fetchVerifications = async (params?: FetchVerificationsParams): Pro
 
   // Handle different response structures
   const data = response.data;
-  if (Array.isArray(data)) {
-    return data;
-  } else if (data && Array.isArray(data.data)) {
-    return data.data;
+  if (data && data.data && Array.isArray(data.data)) {
+    return {
+      data: data.data,
+      meta: data.meta || { total: data.data.length, page: 1, limit: 10, totalPages: 1 }
+    };
+  } else if (Array.isArray(data)) {
+    return {
+      data: data,
+      meta: { total: data.length, page: 1, limit: data.length, totalPages: 1 }
+    };
   } else {
-    return [];
+    return {
+      data: [],
+      meta: { total: 0, page: 1, limit: 10, totalPages: 0 }
+    };
   }
 };
 
-export const fetchComplaints = async (): Promise<Complaint[]> => {
+export interface ExportVerificationsParams {
+  search?: string;
+  category?: string;
+  status?: string;
+  verifiedBy?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ExportVerificationsResponse {
+  data: VerificationLog[];
+  total: number;
+  exportedAt: string;
+}
+
+export const exportVerifications = async (params?: ExportVerificationsParams): Promise<ExportVerificationsResponse> => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${API_BASE_URL}/admin/complaints`, {
+  const queryParams = new URLSearchParams();
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.category && params.category !== 'All') queryParams.append('category', params.category.toUpperCase());
+  if (params?.status && params.status !== 'All') queryParams.append('status', params.status.toUpperCase());
+  if (params?.verifiedBy && params.verifiedBy !== 'All') queryParams.append('verifiedBy', params.verifiedBy);
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+
+  const queryString = queryParams.toString();
+  const url = queryString ? `${API_BASE_URL}/admin/verifications/export/data?${queryString}` : `${API_BASE_URL}/admin/verifications/export/data`;
+
+  const response = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
+export interface FetchComplaintsParams {
+  search?: string;
+  status?: string;
+  reportedBy?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ComplaintsResponse {
+  data: Complaint[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export const fetchComplaints = async (params?: FetchComplaintsParams): Promise<ComplaintsResponse> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const queryParams = new URLSearchParams();
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.status && params.status !== 'All') queryParams.append('status', params.status.toUpperCase());
+  if (params?.reportedBy && params.reportedBy !== 'All') queryParams.append('reportedBy', params.reportedBy);
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+  const queryString = queryParams.toString();
+  const url = queryString ? `${API_BASE_URL}/admin/complaints?${queryString}` : `${API_BASE_URL}/admin/complaints`;
+
+  const response = await axios.get(url, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -93,12 +191,21 @@ export const fetchComplaints = async (): Promise<Complaint[]> => {
 
   // Handle different response structures
   const data = response.data;
-  if (Array.isArray(data)) {
-    return data;
-  } else if (data && Array.isArray(data.data)) {
-    return data.data;
+  if (data && data.data && Array.isArray(data.data)) {
+    return {
+      data: data.data,
+      meta: data.meta || { total: data.data.length, page: 1, limit: 10, totalPages: 1 }
+    };
+  } else if (Array.isArray(data)) {
+    return {
+      data: data,
+      meta: { total: data.length, page: 1, limit: data.length, totalPages: 1 }
+    };
   } else {
-    return [];
+    return {
+      data: [],
+      meta: { total: 0, page: 1, limit: 10, totalPages: 0 }
+    };
   }
 };
 

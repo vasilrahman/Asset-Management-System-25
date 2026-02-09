@@ -66,8 +66,14 @@ export interface Complaint {
   id: string;
   assetId: string;
   assetName: string;
+  assetCategory?: AssetCategory;
+  assetStatus?: AssetStatus;
+  assetSerialNumber?: string;
+  assetLocation?: string;
   reportedBy: string;
+  reportedById?: string;
   date: string;
+  timestamp?: string;
   description: string;
   status: 'Pending' | 'Resolved';
   imageUrl?: string;
@@ -86,6 +92,13 @@ export interface VerificationLog {
   id: string;
   assetId: string;
   assetName: string;
+  assetCategory?: AssetCategory;
+  assetStatus?: AssetStatus;
+  assetSerialNumber?: string;
+  assetLocation?: string;
   verifiedBy: string;
+  verifiedById?: string;
+  verifiedByUsername?: string;
   timestamp: string;
+  verifiedAt?: string;
 }
