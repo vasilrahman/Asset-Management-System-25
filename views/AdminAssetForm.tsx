@@ -35,14 +35,18 @@ export const AdminAssetForm = () => {
           setIsLoading(true);
           try {
             const asset = await fetchAssetById(assetId);
+            // Map API response fields to form fields
             setDefaultValues({
-                name: asset.name,
+                name: asset.assetName || asset.name,
                 category: asset.category,
                 serialNumber: asset.serialNumber,
                 status: asset.status,
             });
-            setSelectedCategory(asset.category);
-            setSelectedStatus(asset.status);
+            // Set category and status (convert to proper case)
+            const categoryValue = asset.category.charAt(0).toUpperCase() + asset.category.slice(1).toLowerCase();
+            const statusValue = asset.status.charAt(0).toUpperCase() + asset.status.slice(1).toLowerCase();
+            setSelectedCategory(categoryValue);
+            setSelectedStatus(statusValue);
             setImagePreview(asset.imageUrl || null);
           } catch (error) {
             console.error('Failed to load asset:', error);
@@ -370,18 +374,20 @@ export const AdminAssetForm = () => {
                 <button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm transition-colors"
+                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-colors"
                 >
-                    {editAssetId ? 'Save Changes' : 'Submit'}
+                    {isSubmitting ? 'Processing...' : (editAssetId ? 'Save Changes' : 'Submit')}
                 </button>
-                <button 
-                    type="submit" 
-                    data-action="qr"
-                    disabled={isSubmitting}
-                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition-colors"
-                >
-                    {isSubmitting ? 'Processing...' : <><QrCode size={18} /> {editAssetId ? 'Save & Re-generate QR' : 'Generate QR & Submit'}</>}
-                </button>
+                {!editAssetId && (
+                    <button 
+                        type="submit" 
+                        data-action="qr"
+                        disabled={isSubmitting}
+                        className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition-colors"
+                    >
+                        {isSubmitting ? 'Processing...' : <><QrCode size={18} /> Generate QR & Submit</>}
+                    </button>
+                )}
             </div>
         </form>
     </div>
