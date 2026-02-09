@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { Asset, VerificationLog, Complaint, User } from '../types';
-import { API_BASE_URL } from '../config/api';
 
 export interface DashboardData {
   totalAssets: number;
@@ -22,8 +21,7 @@ export interface DashboardData {
   };
 }
 
-// Fallback if config not available
-const apiBaseUrl = API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:3015';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const fetchDashboardData = async (): Promise<DashboardData> => {
   const token = localStorage.getItem('accessToken');
@@ -31,7 +29,7 @@ export const fetchDashboardData = async (): Promise<DashboardData> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${apiBaseUrl}/admin/dashboard`, {
+  const response = await axios.get(`${API_BASE_URL}/admin/dashboard`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -40,13 +38,31 @@ export const fetchDashboardData = async (): Promise<DashboardData> => {
   return response.data;
 };
 
-export const fetchVerifications = async (): Promise<VerificationLog[]> => {
+export interface FetchVerificationsParams {
+  search?: string;
+  category?: string;
+  verifiedBy?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export const fetchVerifications = async (params?: FetchVerificationsParams): Promise<VerificationLog[]> => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${apiBaseUrl}/admin/verifications`, {
+  const queryParams = new URLSearchParams();
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.category && params.category !== 'All') queryParams.append('category', params.category);
+  if (params?.verifiedBy && params.verifiedBy !== 'All') queryParams.append('verifiedBy', params.verifiedBy);
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+
+  const queryString = queryParams.toString();
+  const url = queryString ? `${API_BASE_URL}/admin/verifications?${queryString}` : `${API_BASE_URL}/admin/verifications`;
+
+  const response = await axios.get(url, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -69,7 +85,7 @@ export const fetchComplaints = async (): Promise<Complaint[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${apiBaseUrl}/admin/complaints`, {
+  const response = await axios.get(`${API_BASE_URL}/admin/complaints`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -92,7 +108,7 @@ export const fetchUsers = async (): Promise<User[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${apiBaseUrl}/admin/users`, {
+  const response = await axios.get(`${API_BASE_URL}/admin/users`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -208,7 +224,7 @@ export const getStaffAssets = async (): Promise<Asset[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${apiBaseUrl}/staff/assets`, {
+  const response = await axios.get(`${API_BASE_URL}/staff/assets`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -231,7 +247,7 @@ export const getStaffVerifiedHistory = async (): Promise<VerificationLog[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${apiBaseUrl}/staff/history/verified`, {
+  const response = await axios.get(`${API_BASE_URL}/staff/history/verified`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -254,7 +270,7 @@ export const getStaffComplaintHistory = async (): Promise<Complaint[]> => {
     throw new Error('No access token found');
   }
 
-  const response = await axios.get(`${apiBaseUrl}/staff/history/complaints`, {
+  const response = await axios.get(`${API_BASE_URL}/staff/history/complaints`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
