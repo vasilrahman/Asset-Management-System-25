@@ -10,6 +10,7 @@ export type Theme = 'light' | 'dark';
 export interface User {
   id: string;
   name: string;
+  fullName: string;
   username: string;
   password: string; // In real app, never store plain text
   role: Role;
@@ -53,6 +54,7 @@ export interface Asset {
 
   // QR & Files
   isQrGenerated: boolean;
+  qrCode?: string; // QR code identifier (e.g., "QR-123456")
   qrData?: string; // The JSON string encoded in the QR
   attachments: Attachment[];
 
