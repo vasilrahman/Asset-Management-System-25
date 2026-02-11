@@ -71,14 +71,6 @@ export const AdminGenerateQR = () => {
             doc.setFontSize(9);
             doc.setFont("helvetica", "bold");
             doc.text(`QR Code: ${qrCode.code}`, x + cellWidth/2, y + 50, { align: 'center' });
-            
-            // Display QR Code text (truncated if too long)
-            doc.setFontSize(7);
-            doc.setFont("helvetica", "normal");
-            const qrText = qrCode.code.length > 30 
-                ? qrCode.code.substring(0, 30) + '...' 
-                : qrCode.code;
-            doc.text(qrText, x + cellWidth/2, y + 56, { align: 'center', maxWidth: cellWidth - 4 });
 
             col++;
             if (col >= cols) {
