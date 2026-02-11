@@ -274,6 +274,7 @@ export interface RegisterAssetPayload {
   assetName: string;
   category: string;
   serialNumber?: string;
+  imageUrl?: string;
 }
 
 export const registerAsset = async (payload: RegisterAssetPayload): Promise<any> => {
