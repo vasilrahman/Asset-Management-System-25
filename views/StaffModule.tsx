@@ -8,6 +8,7 @@ import jsQR from 'jsqr';
 import { StaffRegisterAsset } from './StaffRegisterAsset';
 import { verifyQRCode } from '../services/dashboardService';
 import { verifyStaffAsset, submitStaffComplaint, fetchStaffAssets, fetchStaffVerifiedHistory, fetchStaffComplaintsHistory } from '../services/assetService';
+import toast from 'react-hot-toast';
 
 type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM' | 'REGISTER_ASSET';
 
@@ -23,6 +24,7 @@ export const StaffModule = () => {
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [scannedQRData, setScannedQRData] = useState<{ qrId: string; qrCode: string; alreadyAssigned?: boolean } | null>(null);
     const [complaintText, setComplaintText] = useState('');
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     // History View State
     const [historyTab, setHistoryTab] = useState<'VERIFIED' | 'COMPLAINTS'>('VERIFIED');
@@ -49,14 +51,7 @@ export const StaffModule = () => {
 
     // Scanner Mode: 'VERIFY' or 'REGISTER'
     const [scannerMode, setScannerMode] = useState<'VERIFY' | 'REGISTER'>('VERIFY');
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
     const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
-
-    // Show toast message
-    const showToast = (message: string, type: 'success' | 'error' | 'warning') => {
-        setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
-    };
 
     // Fetch staff assets when ASSETS view is opened
     useEffect(() => {
@@ -68,7 +63,7 @@ export const StaffModule = () => {
                 })
                 .catch(error => {
                     console.error('Failed to fetch staff assets:', error);
-                    showToast('Failed to load assets', 'error');
+                    toast.error('Failed to load assets');
                     setStaffAssets([]);
                 })
                 .finally(() => {
@@ -91,7 +86,7 @@ export const StaffModule = () => {
                 })
                 .catch(error => {
                     console.error('Failed to fetch verified history:', error);
-                    showToast('Failed to load history', 'error');
+                    toast.error('Failed to load history');
                     setVerifiedHistory([]);
                 })
                 .finally(() => {
@@ -115,7 +110,7 @@ export const StaffModule = () => {
                 })
                 .catch(error => {
                     console.error('Failed to fetch complaints history:', error);
-                    showToast('Failed to load complaints', 'error');
+                    toast.error('Failed to load complaints');
                     setComplaintsHistory([]);
                 })
                 .finally(() => {
@@ -131,14 +126,14 @@ export const StaffModule = () => {
             const response = await verifyQRCode(data);
 
             if (!response.valid) {
-                showToast(response.message || 'Invalid QR code', 'error');
+                toast.error(response.message || 'Invalid QR code');
                 return;
             }
 
             // ✅ VERIFY FLOW
             if (scannerMode === 'VERIFY') {
                 if (!response.alreadyAssigned || !response.asset) {
-                    showToast('This QR is not registered yet', 'warning');
+                    toast('This QR is not registered yet', { icon: '⚠️' });
                     return;
                 }
 
@@ -161,7 +156,7 @@ export const StaffModule = () => {
         } catch (error: any) {
             console.error('QR verification failed:', error);
             const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify QR code';
-            showToast(errorMessage, 'error');
+            toast.error(errorMessage);
         }
     };
 
@@ -175,12 +170,12 @@ export const StaffModule = () => {
                 if (currentUser) {
                     verifyAsset(selectedAsset.id, currentUser.name);
                 }
-                showToast('Asset verified successfully', 'success');
+                toast.success('Asset verified successfully');
                 setView('HOME');
             } catch (error: any) {
                 console.error('Failed to verify asset:', error);
                 const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify asset';
-                showToast(errorMessage, 'error');
+                toast.error(errorMessage);
             }
         } else {
             console.log('Missing selectedAsset');
@@ -218,12 +213,22 @@ export const StaffModule = () => {
                 }
                 setComplaintText('');
                 setComplaintImage('');
-                showToast('Issue reported successfully', 'success');
+                toast.success('Issue reported successfully');
                 setView('HOME');
             } catch (error: any) {
                 console.error('Failed to submit complaint:', error);
-                const errorMessage = error?.response?.data?.message || error?.message || 'Failed to report issue';
-                showToast(errorMessage, 'error');
+                let errorMessage = 'Failed to report issue';
+                
+                // Handle 413 Payload Too Large error
+                if (error?.response?.status === 413 || error?.message?.includes('413')) {
+                    errorMessage = 'Image size is too large. Please upload a smaller image (max 2MB).';
+                } else if (error?.response?.data?.message) {
+                    errorMessage = error.response.data.message;
+                } else if (error?.message) {
+                    errorMessage = error.message;
+                }
+                
+                toast.error(errorMessage);
             } finally {
                 setIsSubmittingComplaint(false);
             }
@@ -251,6 +256,14 @@ export const StaffModule = () => {
     const handleImageRegisterUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Validate file size (2MB limit)
+            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            if (file.size > maxSize) {
+                toast.error('Image size must be less than 2MB. Please choose a smaller image.');
+                e.target.value = ''; // Reset input
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (ev) => {
                 setRegData(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
@@ -262,6 +275,14 @@ export const StaffModule = () => {
     const handleComplaintImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Validate file size (2MB limit)
+            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            if (file.size > maxSize) {
+                toast.error('Image size must be less than 2MB. Please choose a smaller image.');
+                e.target.value = ''; // Reset input
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (ev) => {
                 setComplaintImage(ev.target?.result as string);
@@ -426,12 +447,12 @@ export const StaffModule = () => {
     // 1. Staff Home
     if (view === 'HOME') {
         return (
-            <div className="p-6 space-y-8 animate-in fade-in duration-300">
-                {toast && <Toast message={toast.message} type={toast.type} />}
-                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
-                    <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
-                    <p className="text-indigo-100 font-light">What would you like to do today?</p>
-                </div>
+            <>
+                <div className="p-6 space-y-8 animate-in fade-in duration-300">
+                    <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
+                        <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
+                        <p className="text-indigo-100 font-light">What would you like to do today?</p>
+                    </div>
 
                 {/* 2-2-1 Grid Layout */}
                 {/* 2-2-1 Grid Layout */}
@@ -469,6 +490,30 @@ export const StaffModule = () => {
                     />
                 </div>
             </div>
+            
+            {/* Image Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        <img 
+                            src={selectedImage} 
+                            alt="Complaint Evidence" 
+                            className="w-full h-full object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+            </>
         );
     }
 
@@ -490,7 +535,6 @@ export const StaffModule = () => {
     if (view === 'SCANNER') {
         return (
             <div className="fixed inset-0 bg-black text-white z-50 flex flex-col">
-                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="p-6 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent absolute top-0 w-full z-10">
                     <button onClick={() => setView('HOME')} className="bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-colors"><X size={24} /></button>
                     <span className="font-medium tracking-wide">{scannerMode === 'REGISTER' ? 'Scan New QR' : 'Scan Asset QR'}</span>
@@ -651,7 +695,7 @@ export const StaffModule = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <InfoCard label="Serial" value={selectedAsset.serialNumber} />
                             <InfoCard label="Category" value={selectedAsset.category} />
-                            <InfoCard label="Location" value={selectedAsset.location} />
+                            <InfoCard label="Created At" value={selectedAsset.createdAt ? new Date(selectedAsset.createdAt).toLocaleDateString() : 'N/A'} />
                             <InfoCard label="Last Verified" value={selectedAsset.lastVerifiedDate ? new Date(selectedAsset.lastVerifiedDate).toLocaleDateString() : 'Never'} />
                         </div>
                     </div>
@@ -829,8 +873,13 @@ export const StaffModule = () => {
                                         </p>
                                         {complaint.imageUrl && (
                                             <div className="mt-3">
-                                                <p className="text-xs font-semibold text-slate-500 mb-1">Evidence:</p>
-                                                <img src={complaint.imageUrl} alt="Evidence" className="h-24 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
+                                                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Evidence:</p>
+                                                <img 
+                                                    src={complaint.imageUrl} 
+                                                    alt="Complaint Evidence" 
+                                                    className="rounded-lg object-cover border border-slate-200 dark:border-slate-700 shadow-sm w-full max-w-[200px] h-32 hover:scale-105 transition-transform cursor-pointer"
+                                                    onClick={() => setSelectedImage(complaint.imageUrl!)}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -839,6 +888,29 @@ export const StaffModule = () => {
                         </>
                     )}
                 </div>
+                
+                {/* Image Modal */}
+                {selectedImage && (
+                    <div 
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setSelectedImage(null)}
+                    >
+                        <div className="relative max-w-4xl max-h-[90vh] w-full">
+                            <button
+                                onClick={() => setSelectedImage(null)}
+                                className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                            <img 
+                                src={selectedImage} 
+                                alt="Complaint Evidence" 
+                                className="w-full h-full object-contain rounded-lg"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -897,17 +969,29 @@ export const StaffModule = () => {
                         ></textarea>
                     </div>
 
-                    <label className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-slate-400 font-medium flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 transition-colors cursor-pointer">
-                        {complaintImage ? (
-                            <img src={complaintImage} className="max-h-32 object-contain" />
-                        ) : (
-                            <>
-                                <Camera size={24} />
-                                <span>Attach Photo Evidence</span>
-                            </>
-                        )}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleComplaintImageUpload} />
-                    </label>
+                    {complaintImage ? (
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Photo Evidence</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setComplaintImage('')}
+                                    className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors"
+                                >
+                                    <X size={14} />
+                                    Remove
+                                </button>
+                            </div>
+                            <img src={complaintImage} className="w-full max-h-48 object-contain rounded-lg border border-slate-200 dark:border-slate-700" />
+                        </div>
+                    ) : (
+                        <label className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-slate-400 font-medium flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 transition-colors cursor-pointer">
+                            <Camera size={24} />
+                            <span>Attach Photo Evidence</span>
+                            <span className="text-xs text-slate-400">Max size: 2MB</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={handleComplaintImageUpload} />
+                        </label>
+                    )}
 
                     <button 
                         type="submit" 
@@ -921,7 +1005,32 @@ export const StaffModule = () => {
         );
     }
 
-    return null;
+    return (
+        <>
+            {/* Image Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        <img 
+                            src={selectedImage} 
+                            alt="Complaint Evidence" 
+                            className="w-full h-full object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+        </>
+    );
 };
 
 const DashboardTile = ({ icon, title, subtitle, color, onClick, isPrimary, fullWidth }: any) => (
@@ -945,18 +1054,3 @@ const InfoCard = ({ label, value }: { label: string, value: string }) => (
         <p className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={value}>{value}</p>
     </div>
 );
-
-// Toast Component
-const Toast = ({ message, type }: { message: string; type: 'success' | 'error' | 'warning' }) => {
-    const bgColors = {
-        success: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200',
-        error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
-        warning: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
-    };
-
-    return (
-        <div className={`fixed top-4 right-4 z-50 ${bgColors[type]} border px-6 py-4 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300`}>
-            <p className="font-medium">{message}</p>
-        </div>
-    );
-};

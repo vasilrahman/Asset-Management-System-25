@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, QrCode, Package, CheckCircle, Loader } from 'lucide-react';
+import { ArrowLeft, QrCode, Package, CheckCircle, Loader, Camera, X, ImageIcon } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
 import { registerAsset } from '../services/dashboardService';
+import toast from 'react-hot-toast';
 
 interface StaffRegisterAssetProps {
   qrCode?: string;
@@ -17,9 +18,10 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
     category: 'LAPTOP',
     serialNumber: ''
   });
+  const [assetImage, setAssetImage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string>('');
+  const [imageError, setImageError] = useState<string>('');
 
   const categoryOptions = [
     { value: 'LAPTOP', label: 'Laptop' },
@@ -28,6 +30,27 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
     { value: 'TABLET', label: 'Tablet' },
     { value: 'OTHER', label: 'Other' },
   ];
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (2MB limit)
+      const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+      if (file.size > maxSize) {
+        setImageError('Image size must be less than 2MB. Please choose a smaller image.');
+        e.target.value = ''; // Reset input
+        setTimeout(() => setImageError(''), 5000);
+        return;
+      }
+
+      setImageError('');
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setAssetImage(ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,11 +68,12 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
         qrCode,
         assetName: formData.assetName,
         category: formData.category,
-        serialNumber: formData.serialNumber || undefined
+        serialNumber: formData.serialNumber || undefined,
+        imageUrl: assetImage || undefined
       });
       
       // Show success message
-      setShowSuccess(true);
+      toast.success('Asset registered successfully!');
       
       // Redirect to staff dashboard after 2 seconds
       setTimeout(() => {
@@ -58,7 +82,20 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
       
     } catch (err: any) {
       console.error('Asset registration failed:', err);
-      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to register asset. Please try again.';
+      let errorMessage = 'Failed to register asset. Please try again.';
+      
+      // Handle 413 Payload Too Large error
+      if (err?.response?.status === 413 || err?.message?.includes('413')) {
+        errorMessage = 'Image size is too large. Please upload a smaller image (max 2MB).';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      // Show error toast
+      toast.error(errorMessage);
+      
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -68,14 +105,6 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6">
       <div className="max-w-2xl mx-auto">
-        {/* Success Toast */}
-        {showSuccess && (
-          <div className="fixed top-4 right-4 z-50 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-            <CheckCircle size={20} />
-            <span className="font-medium">Asset registered successfully!</span>
-          </div>
-        )}
-
         {/* Header */}
         <div className="mb-8">
           <button 
@@ -165,6 +194,52 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
                 className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="e.g. SN-123456789"
               />
+            </div>
+
+            {/* Asset Image Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+                Asset Image <span className="text-slate-400 text-xs">(Optional, Max 2MB)</span>
+              </label>
+              {assetImage ? (
+                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <ImageIcon size={14} />
+                      Image Preview
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAssetImage('')}
+                      disabled={alreadyAssigned}
+                      className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <X size={14} />
+                      Remove
+                    </button>
+                  </div>
+                  <img src={assetImage} className="w-full max-h-48 object-contain rounded-lg border border-slate-200 dark:border-slate-700" alt="Asset preview" />
+                </div>
+              ) : (
+                <label className={`w-full py-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg text-slate-400 font-medium flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 transition-colors ${alreadyAssigned ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <Camera size={28} />
+                  <span className="text-sm">Upload Asset Image</span>
+                  <span className="text-xs text-slate-400">Max size: 2MB</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageUpload}
+                    disabled={alreadyAssigned}
+                  />
+                </label>
+              )}
+              {imageError && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                  <X size={12} />
+                  {imageError}
+                </p>
+              )}
             </div>
           </div>
 

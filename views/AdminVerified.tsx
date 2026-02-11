@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, X, Calendar, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle, X, Calendar, Download, ChevronLeft, ChevronRight, ChevronDown, FileSpreadsheet, FileText, Search, RefreshCw } from 'lucide-react';
 import { VerificationLog } from '../types';
 import { fetchVerifications, exportVerifications } from '../services/dashboardService';
 import { CustomSelect } from '../components/CustomSelect';
@@ -10,8 +10,11 @@ export const AdminVerified = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [startDate, setStartDate] = useState('');
@@ -23,12 +26,21 @@ export const AdminVerified = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [limit] = useState(10);
 
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const loadVerifications = async () => {
     setLoading(true);
     setError(null);
     try {
       console.log('Fetching verifications...');
       const params = {
+        search: debouncedSearch || undefined,
         category: selectedCategory !== 'All' ? selectedCategory : undefined,
         status: selectedStatus !== 'All' ? selectedStatus : undefined,
         startDate: startDate || undefined,
@@ -64,10 +76,13 @@ export const AdminVerified = () => {
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'excel' | 'pdf') => {
     setExporting(true);
+    setIsExportDropdownOpen(false);
+    
     try {
       const params = {
+        search: debouncedSearch || undefined,
         category: selectedCategory !== 'All' ? selectedCategory : undefined,
         status: selectedStatus !== 'All' ? selectedStatus : undefined,
         startDate: startDate || undefined,
@@ -75,17 +90,33 @@ export const AdminVerified = () => {
       };
       const exportData = await exportVerifications(params);
       
-      // Convert to CSV
-      const csvContent = convertToCSV(exportData.data);
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `verifications_export_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Handle different response structures
+      let data: VerificationLog[] = [];
+      if (exportData && typeof exportData === 'object') {
+        if (Array.isArray(exportData.data)) {
+          data = exportData.data;
+        } else if (Array.isArray(exportData)) {
+          data = exportData as VerificationLog[];
+        }
+      }
+
+      // Validate data is an array
+      if (!Array.isArray(data) || data.length === 0) {
+        if (data.length === 0) {
+          alert('No data to export');
+        } else {
+          console.error('Invalid export data format:', exportData);
+          throw new Error('Invalid data format received from server');
+        }
+        setExporting(false);
+        return;
+      }
+
+      if (format === 'excel') {
+        await exportToExcel(data);
+      } else {
+        await exportToPDF(data);
+      }
     } catch (err: any) {
       console.error('Failed to export verifications:', err);
       alert('Failed to export data. Please try again.');
@@ -94,38 +125,90 @@ export const AdminVerified = () => {
     }
   };
 
-  const convertToCSV = (data: VerificationLog[]): string => {
-    if (data.length === 0) return '';
+  const exportToExcel = async (data: VerificationLog[]) => {
+    // Dynamic import to reduce bundle size
+    const XLSX = await import('xlsx');
     
-    const headers = ['Asset Name', 'Category', 'Status', 'Serial Number', 'Location', 'Verified By', 'Verification Date'];
-    const rows = data.map(log => [
-      log.assetName || '',
-      log.assetCategory || '',
-      log.assetStatus || '',
-      log.assetSerialNumber || '',
-      log.assetLocation || '',
-      log.verifiedBy || '',
-      log.timestamp ? new Date(log.timestamp).toLocaleString() : ''
+    const worksheetData = data.map((log) => ({
+      'Asset Name': log.assetName || 'N/A',
+      'Category': log.assetCategory || 'N/A',
+      'Status': log.assetStatus || 'N/A',
+      'Serial Number': log.assetSerialNumber || 'N/A',
+      'Location': log.assetLocation || 'N/A',
+      'Verified By': log.verifiedBy || 'N/A',
+      'Verification Date': (log.timestamp || log.verifiedAt) ? new Date(log.timestamp || log.verifiedAt || '').toLocaleString() : 'N/A',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Verifications');
+    
+    // Auto-size columns
+    const maxWidth = 30;
+    const colWidths = Object.keys(worksheetData[0] || {}).map(key => ({
+      wch: Math.min(Math.max(key.length, 10), maxWidth)
+    }));
+    worksheet['!cols'] = colWidths;
+
+    const fileName = `verifications-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const exportToPDF = async (data: VerificationLog[]) => {
+    // Dynamic import to reduce bundle size
+    const { jsPDF } = await import('jspdf');
+    const autoTable = (await import('jspdf-autotable')).default;
+    
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(18);
+    doc.text('Verification Logs Report', 14, 20);
+    
+    // Export date
+    doc.setFontSize(10);
+    doc.text(`Exported on: ${new Date().toLocaleString()}`, 14, 28);
+    
+    // Table
+    const tableData = data.map((log) => [
+      log.assetName || 'N/A',
+      log.assetCategory || 'N/A',
+      log.assetStatus || 'N/A',
+      log.assetSerialNumber || 'N/A',
+      log.assetLocation || 'N/A',
+      log.verifiedBy || 'N/A',
+      (log.timestamp || log.verifiedAt) ? new Date(log.timestamp || log.verifiedAt || '').toLocaleDateString() : 'N/A',
     ]);
-    
-    const csvRows = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ];
-    
-    return csvRows.join('\\n');
+
+    autoTable(doc, {
+      head: [['Asset', 'Category', 'Status', 'Serial', 'Location', 'Verified By', 'Date']],
+      body: tableData,
+      startY: 35,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229], textColor: 255 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    const fileName = `verifications-export-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
   };
 
   useEffect(() => {
     loadVerifications();
-  }, [selectedCategory, selectedStatus, startDate, endDate, currentPage]);
+  }, [debouncedSearch, selectedCategory, selectedStatus, startDate, endDate, currentPage]);
 
   const handleClearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearch('');
     setSelectedCategory('All');
     setSelectedStatus('All');
     setStartDate('');
     setEndDate('');
     setCurrentPage(1);
+  };
+
+  const handleRefresh = () => {
+    loadVerifications();
   };
 
   const handlePageChange = (newPage: number) => {
@@ -160,19 +243,71 @@ export const AdminVerified = () => {
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Verification Logs</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Filter and view asset verification history</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={loading}
+                        className="p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh data"
+                    >
+                        <RefreshCw size={18} className={`text-slate-600 dark:text-slate-300 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
                     <div className="bg-emerald-50 dark:bg-emerald-900/20 px-4 py-2 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-2">
                         <CheckCircle size={20} />
                         {totalRecords} Total
                     </div>
-                    <button
-                        onClick={handleExport}
-                        disabled={exporting || logs.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors shadow-sm"
-                    >
-                        <Download size={18} />
-                        {exporting ? 'Exporting...' : 'Export CSV'}
-                    </button>
+                    
+                    {/* Export Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                            disabled={exporting || logs.length === 0}
+                            className={`flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition-all ${
+                                exporting || logs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                        >
+                            <Download size={18} />
+                            {exporting ? 'Exporting...' : 'Export'}
+                            {!exporting && logs.length > 0 && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
+                        </button>
+
+                        {isExportDropdownOpen && !exporting && logs.length > 0 && (
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
+                                <button
+                                    onClick={() => handleExport('excel')}
+                                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors"
+                                >
+                                    <FileSpreadsheet size={16} />
+                                    Export as Excel
+                                </button>
+                                <button
+                                    onClick={() => handleExport('pdf')}
+                                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
+                                >
+                                    <FileText size={16} />
+                                    Export as PDF
+                                </button>
+                            </div>
+                        )}
+                        {isExportDropdownOpen && !exporting && logs.length > 0 && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
+                    </div>
+                </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="mb-4">
+                <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setCurrentPage(1);
+                        }}
+                        placeholder="Search by asset name, serial number, or verified by..."
+                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-600 focus:border-transparent transition-all"
+                    />
                 </div>
             </div>
 
@@ -281,13 +416,16 @@ export const AdminVerified = () => {
                                       </span>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
-                                          log.assetStatus === 'Active' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
-                                          log.assetStatus === 'Maintenance' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
-                                          log.assetStatus === 'Retired' ? 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300' :
-                                          log.assetStatus === 'Lost' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${
+                                          log.assetStatus === 'Active' || log.assetStatus === 'ACTIVE' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
+                                          log.assetStatus === 'Maintenance' || log.assetStatus === 'MAINTENANCE' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                          log.assetStatus === 'Retired' || log.assetStatus === 'RETIRED' ? 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300' :
+                                          log.assetStatus === 'Lost' || log.assetStatus === 'LOST' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
                                           'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300'
                                       }`}>
+                                          {(log.assetStatus === 'Active' || log.assetStatus === 'ACTIVE') && (
+                                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400"></span>
+                                          )}
                                           {log.assetStatus || 'N/A'}
                                       </span>
                                   </td>

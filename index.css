@@ -41,3 +41,35 @@ body {
   90% { opacity: 1; }
   100% { top: 100%; opacity: 0; }
 }
+
+/* Toast animations */
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(calc(100% + 40px)) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(calc(100% + 40px)) scale(0.95);
+    opacity: 0;
+  }
+}
+
+/* Apply toast animations */
+.toast-enter {
+  animation: toastSlideIn 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+.toast-exit {
+  animation: toastSlideOut 0.3s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
+}
