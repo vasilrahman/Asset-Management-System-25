@@ -223,7 +223,17 @@ export const StaffModule = () => {
                 setView('HOME');
             } catch (error: any) {
                 console.error('Failed to submit complaint:', error);
-                const errorMessage = error?.response?.data?.message || error?.message || 'Failed to report issue';
+                let errorMessage = 'Failed to report issue';
+                
+                // Handle 413 Payload Too Large error
+                if (error?.response?.status === 413 || error?.message?.includes('413')) {
+                    errorMessage = 'Image size is too large. Please upload a smaller image (max 2MB).';
+                } else if (error?.response?.data?.message) {
+                    errorMessage = error.response.data.message;
+                } else if (error?.message) {
+                    errorMessage = error.message;
+                }
+                
                 showToast(errorMessage, 'error');
             } finally {
                 setIsSubmittingComplaint(false);
@@ -252,6 +262,14 @@ export const StaffModule = () => {
     const handleImageRegisterUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Validate file size (2MB limit)
+            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            if (file.size > maxSize) {
+                showToast('Image size must be less than 2MB. Please choose a smaller image.', 'error');
+                e.target.value = ''; // Reset input
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (ev) => {
                 setRegData(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
@@ -263,6 +281,14 @@ export const StaffModule = () => {
     const handleComplaintImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Validate file size (2MB limit)
+            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            if (file.size > maxSize) {
+                showToast('Image size must be less than 2MB. Please choose a smaller image.', 'error');
+                e.target.value = ''; // Reset input
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (ev) => {
                 setComplaintImage(ev.target?.result as string);
@@ -657,6 +683,7 @@ export const StaffModule = () => {
     if (view === 'DETAIL' && selectedAsset) {
         return (
             <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col animate-in slide-in-from-bottom-10 duration-300">
+                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="relative h-72 bg-slate-800 flex items-center justify-center">
                     {selectedAsset.imageUrl ? (
                         <img src={selectedAsset.imageUrl} className="w-full h-full object-cover opacity-80" alt="Asset" />
@@ -703,6 +730,7 @@ export const StaffModule = () => {
         );
         return (
             <div className="p-4 h-full flex flex-col bg-slate-50 dark:bg-slate-900">
+                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="flex items-center gap-4 mb-4 pt-2">
                     <button onClick={() => setView('HOME')} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-500 dark:text-slate-400"><ChevronLeft size={24} /></button>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Assets</h2>
@@ -766,6 +794,7 @@ export const StaffModule = () => {
 
         return (
             <div className="p-6 h-full flex flex-col bg-slate-50 dark:bg-slate-900">
+                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="flex items-center gap-4 mb-6">
                     <button onClick={() => setView('HOME')} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-500 dark:text-slate-400"><ChevronLeft size={24} /></button>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white">History</h2>
@@ -901,6 +930,7 @@ export const StaffModule = () => {
     if (view === 'COMPLAINT') {
         return (
             <div className="p-6 min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
+                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="flex justify-between items-center mb-8">
                     <button onClick={() => setView('HOME')} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-medium"><ChevronLeft size={20} /> Cancel</button>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">Report Issue</h2>
@@ -951,17 +981,29 @@ export const StaffModule = () => {
                         ></textarea>
                     </div>
 
-                    <label className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-slate-400 font-medium flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 transition-colors cursor-pointer">
-                        {complaintImage ? (
-                            <img src={complaintImage} className="max-h-32 object-contain" />
-                        ) : (
-                            <>
-                                <Camera size={24} />
-                                <span>Attach Photo Evidence</span>
-                            </>
-                        )}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleComplaintImageUpload} />
-                    </label>
+                    {complaintImage ? (
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Photo Evidence</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setComplaintImage('')}
+                                    className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors"
+                                >
+                                    <X size={14} />
+                                    Remove
+                                </button>
+                            </div>
+                            <img src={complaintImage} className="w-full max-h-48 object-contain rounded-lg border border-slate-200 dark:border-slate-700" />
+                        </div>
+                    ) : (
+                        <label className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-slate-400 font-medium flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 transition-colors cursor-pointer">
+                            <Camera size={24} />
+                            <span>Attach Photo Evidence</span>
+                            <span className="text-xs text-slate-400">Max size: 2MB</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={handleComplaintImageUpload} />
+                        </label>
+                    )}
 
                     <button 
                         type="submit" 
@@ -1036,7 +1078,7 @@ const Toast = ({ message, type }: { message: string; type: 'success' | 'error' |
     };
 
     return (
-        <div className={`fixed top-4 right-4 z-50 ${bgColors[type]} border px-6 py-4 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300`}>
+        <div className={`fixed top-4 right-4 z-[60] ${bgColors[type]} border px-6 py-4 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300`}>
             <p className="font-medium">{message}</p>
         </div>
     );
