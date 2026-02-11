@@ -11,7 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<User>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,7 +86,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return user;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const token = localStorage.getItem('accessToken');
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
+    // Call logout API if token exists
+    if (token) {
+      try {
+        await fetch(`${apiBaseUrl}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (error) {
+        console.error('Logout API call failed:', error);
+        // Continue with local logout even if API call fails
+      }
+    }
+
+    // Always clear local state and storage
     localStorage.removeItem('accessToken');
     setUser(null);
     setIsAuthenticated(false);

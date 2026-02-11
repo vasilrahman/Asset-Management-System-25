@@ -17,18 +17,34 @@ import { AdminComplaints } from './views/AdminComplaints';
 
 import { LayoutDashboard, Package, Users, LogOut, Menu, X, Bell, AlertTriangle, User, Moon, Sun, ChevronDown, QrCode, CheckCircle, MessageSquare } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 const MainLayout = () => {
     const { currentRoute, navigate, theme, toggleTheme } = useApp();
     const { isAuthenticated, user, logout: authLogout } = useAuth();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const profileRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setShowLogoutModal(false);
     }, [user]);
+
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await authLogout();
+            toast.success('Logged out successfully');
+            setShowLogoutModal(false);
+        } catch (error) {
+            console.error('Logout error:', error);
+            toast.error('Logout failed. Please try again.');
+        } finally {
+            setIsLoggingOut(false);
+        }
+    };
 
     // Click outside to close profile dropdown
     useEffect(() => {
@@ -78,11 +94,11 @@ const MainLayout = () => {
                             <h3 className="text-xl font-bold text-center text-slate-800 dark:text-white mb-2">Sign Out?</h3>
                             <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to log out of your account?</p>
                             <div className="flex gap-3">
-                                <button onClick={() => setShowLogoutModal(false)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
+                                <button onClick={() => setShowLogoutModal(false)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors" disabled={isLoggingOut}>
                                     Cancel
                                 </button>
-                                <button onClick={authLogout} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
-                                    Sign Out
+                                <button onClick={handleLogout} disabled={isLoggingOut} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                                 </button>
                             </div>
                         </div>
@@ -285,11 +301,11 @@ const MainLayout = () => {
                         <h3 className="text-xl font-bold text-center text-slate-800 dark:text-white mb-2">Sign Out?</h3>
                         <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Are you sure you want to log out of your account?</p>
                         <div className="flex gap-3">
-                            <button onClick={() => setShowLogoutModal(false)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors">
+                            <button onClick={() => setShowLogoutModal(false)} className="flex-1 py-3 font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-xl transition-colors" disabled={isLoggingOut}>
                                 Cancel
                             </button>
-                            <button onClick={authLogout} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
-                                Sign Out
+                            <button onClick={handleLogout} disabled={isLoggingOut} className="flex-1 py-3 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                             </button>
                         </div>
                     </div>
