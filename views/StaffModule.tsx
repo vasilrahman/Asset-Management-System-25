@@ -8,6 +8,7 @@ import jsQR from 'jsqr';
 import { StaffRegisterAsset } from './StaffRegisterAsset';
 import { verifyQRCode } from '../services/dashboardService';
 import { verifyStaffAsset, submitStaffComplaint, fetchStaffAssets, fetchStaffVerifiedHistory, fetchStaffComplaintsHistory } from '../services/assetService';
+import toast from 'react-hot-toast';
 
 type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM' | 'REGISTER_ASSET';
 
@@ -50,14 +51,7 @@ export const StaffModule = () => {
 
     // Scanner Mode: 'VERIFY' or 'REGISTER'
     const [scannerMode, setScannerMode] = useState<'VERIFY' | 'REGISTER'>('VERIFY');
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
     const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
-
-    // Show toast message
-    const showToast = (message: string, type: 'success' | 'error' | 'warning') => {
-        setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
-    };
 
     // Fetch staff assets when ASSETS view is opened
     useEffect(() => {
@@ -69,7 +63,7 @@ export const StaffModule = () => {
                 })
                 .catch(error => {
                     console.error('Failed to fetch staff assets:', error);
-                    showToast('Failed to load assets', 'error');
+                    toast.error('Failed to load assets');
                     setStaffAssets([]);
                 })
                 .finally(() => {
@@ -92,7 +86,7 @@ export const StaffModule = () => {
                 })
                 .catch(error => {
                     console.error('Failed to fetch verified history:', error);
-                    showToast('Failed to load history', 'error');
+                    toast.error('Failed to load history');
                     setVerifiedHistory([]);
                 })
                 .finally(() => {
@@ -116,7 +110,7 @@ export const StaffModule = () => {
                 })
                 .catch(error => {
                     console.error('Failed to fetch complaints history:', error);
-                    showToast('Failed to load complaints', 'error');
+                    toast.error('Failed to load complaints');
                     setComplaintsHistory([]);
                 })
                 .finally(() => {
@@ -132,14 +126,14 @@ export const StaffModule = () => {
             const response = await verifyQRCode(data);
 
             if (!response.valid) {
-                showToast(response.message || 'Invalid QR code', 'error');
+                toast.error(response.message || 'Invalid QR code');
                 return;
             }
 
             // ✅ VERIFY FLOW
             if (scannerMode === 'VERIFY') {
                 if (!response.alreadyAssigned || !response.asset) {
-                    showToast('This QR is not registered yet', 'warning');
+                    toast('This QR is not registered yet', { icon: '⚠️' });
                     return;
                 }
 
@@ -162,7 +156,7 @@ export const StaffModule = () => {
         } catch (error: any) {
             console.error('QR verification failed:', error);
             const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify QR code';
-            showToast(errorMessage, 'error');
+            toast.error(errorMessage);
         }
     };
 
@@ -176,12 +170,12 @@ export const StaffModule = () => {
                 if (currentUser) {
                     verifyAsset(selectedAsset.id, currentUser.name);
                 }
-                showToast('Asset verified successfully', 'success');
+                toast.success('Asset verified successfully');
                 setView('HOME');
             } catch (error: any) {
                 console.error('Failed to verify asset:', error);
                 const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify asset';
-                showToast(errorMessage, 'error');
+                toast.error(errorMessage);
             }
         } else {
             console.log('Missing selectedAsset');
@@ -219,7 +213,7 @@ export const StaffModule = () => {
                 }
                 setComplaintText('');
                 setComplaintImage('');
-                showToast('Issue reported successfully', 'success');
+                toast.success('Issue reported successfully');
                 setView('HOME');
             } catch (error: any) {
                 console.error('Failed to submit complaint:', error);
@@ -234,7 +228,7 @@ export const StaffModule = () => {
                     errorMessage = error.message;
                 }
                 
-                showToast(errorMessage, 'error');
+                toast.error(errorMessage);
             } finally {
                 setIsSubmittingComplaint(false);
             }
@@ -265,7 +259,7 @@ export const StaffModule = () => {
             // Validate file size (2MB limit)
             const maxSize = 2 * 1024 * 1024; // 2MB in bytes
             if (file.size > maxSize) {
-                showToast('Image size must be less than 2MB. Please choose a smaller image.', 'error');
+                toast.error('Image size must be less than 2MB. Please choose a smaller image.');
                 e.target.value = ''; // Reset input
                 return;
             }
@@ -284,7 +278,7 @@ export const StaffModule = () => {
             // Validate file size (2MB limit)
             const maxSize = 2 * 1024 * 1024; // 2MB in bytes
             if (file.size > maxSize) {
-                showToast('Image size must be less than 2MB. Please choose a smaller image.', 'error');
+                toast.error('Image size must be less than 2MB. Please choose a smaller image.');
                 e.target.value = ''; // Reset input
                 return;
             }
@@ -455,7 +449,6 @@ export const StaffModule = () => {
         return (
             <>
                 <div className="p-6 space-y-8 animate-in fade-in duration-300">
-                    {toast && <Toast message={toast.message} type={toast.type} />}
                     <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
                         <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
                         <p className="text-indigo-100 font-light">What would you like to do today?</p>
@@ -542,7 +535,6 @@ export const StaffModule = () => {
     if (view === 'SCANNER') {
         return (
             <div className="fixed inset-0 bg-black text-white z-50 flex flex-col">
-                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="p-6 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent absolute top-0 w-full z-10">
                     <button onClick={() => setView('HOME')} className="bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-colors"><X size={24} /></button>
                     <span className="font-medium tracking-wide">{scannerMode === 'REGISTER' ? 'Scan New QR' : 'Scan Asset QR'}</span>
@@ -683,7 +675,6 @@ export const StaffModule = () => {
     if (view === 'DETAIL' && selectedAsset) {
         return (
             <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col animate-in slide-in-from-bottom-10 duration-300">
-                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="relative h-72 bg-slate-800 flex items-center justify-center">
                     {selectedAsset.imageUrl ? (
                         <img src={selectedAsset.imageUrl} className="w-full h-full object-cover opacity-80" alt="Asset" />
@@ -730,7 +721,6 @@ export const StaffModule = () => {
         );
         return (
             <div className="p-4 h-full flex flex-col bg-slate-50 dark:bg-slate-900">
-                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="flex items-center gap-4 mb-4 pt-2">
                     <button onClick={() => setView('HOME')} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-500 dark:text-slate-400"><ChevronLeft size={24} /></button>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Assets</h2>
@@ -794,7 +784,6 @@ export const StaffModule = () => {
 
         return (
             <div className="p-6 h-full flex flex-col bg-slate-50 dark:bg-slate-900">
-                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="flex items-center gap-4 mb-6">
                     <button onClick={() => setView('HOME')} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm text-slate-500 dark:text-slate-400"><ChevronLeft size={24} /></button>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white">History</h2>
@@ -930,7 +919,6 @@ export const StaffModule = () => {
     if (view === 'COMPLAINT') {
         return (
             <div className="p-6 min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
-                {toast && <Toast message={toast.message} type={toast.type} />}
                 <div className="flex justify-between items-center mb-8">
                     <button onClick={() => setView('HOME')} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-medium"><ChevronLeft size={20} /> Cancel</button>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">Report Issue</h2>
@@ -1019,8 +1007,6 @@ export const StaffModule = () => {
 
     return (
         <>
-            {toast && <Toast message={toast.message} type={toast.type} />}
-            
             {/* Image Modal */}
             {selectedImage && (
                 <div 
@@ -1068,18 +1054,3 @@ const InfoCard = ({ label, value }: { label: string, value: string }) => (
         <p className="font-semibold text-slate-800 dark:text-slate-200 truncate" title={value}>{value}</p>
     </div>
 );
-
-// Toast Component
-const Toast = ({ message, type }: { message: string; type: 'success' | 'error' | 'warning' }) => {
-    const bgColors = {
-        success: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200',
-        error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
-        warning: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
-    };
-
-    return (
-        <div className={`fixed top-4 right-4 z-[60] ${bgColors[type]} border px-6 py-4 rounded-xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300`}>
-            <p className="font-medium">{message}</p>
-        </div>
-    );
-};

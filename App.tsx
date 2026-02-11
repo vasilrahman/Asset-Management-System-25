@@ -304,26 +304,54 @@ const App = () => {
         <AppProvider>
             <MainLayout />
             <Toaster 
-                position="top-right"
+                position="bottom-right"
+                reverseOrder={false}
+                gutter={8}
+                containerClassName=""
+                containerStyle={{}}
                 toastOptions={{
                     duration: 3000,
+                    className: 'toast-enter',
                     style: {
-                        background: '#1e293b',
-                        color: '#f1f5f9',
+                        borderRadius: '10px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        fontWeight: '500',
+                        padding: '12px 16px',
                     },
                     success: {
+                        duration: 3000,
+                        className: 'toast-enter',
+                        style: {
+                            background: '#10b981',
+                            color: '#ffffff',
+                        },
                         iconTheme: {
-                            primary: '#10b981',
-                            secondary: '#fff',
+                            primary: '#ffffff',
+                            secondary: '#10b981',
                         },
                     },
                     error: {
+                        duration: 3000,
+                        className: 'toast-enter',
+                        style: {
+                            background: '#ef4444',
+                            color: '#ffffff',
+                        },
                         iconTheme: {
-                            primary: '#ef4444',
-                            secondary: '#fff',
+                            primary: '#ffffff',
+                            secondary: '#ef4444',
+                        },
+                    },
+                    loading: {
+                        duration: 3000,
+                        className: 'toast-enter',
+                        style: {
+                            background: '#3b82f6',
+                            color: '#ffffff',
                         },
                     },
                 }}
+                toastLimit={3}
             />
         </AppProvider>
     );

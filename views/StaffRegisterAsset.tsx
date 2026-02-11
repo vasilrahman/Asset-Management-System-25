@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { ArrowLeft, QrCode, Package, CheckCircle, Loader, Camera, X, ImageIcon } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
 import { registerAsset } from '../services/dashboardService';
+import toast from 'react-hot-toast';
 
 interface StaffRegisterAssetProps {
   qrCode?: string;
@@ -19,11 +20,8 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
   });
   const [assetImage, setAssetImage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string>('');
   const [imageError, setImageError] = useState<string>('');
-  const [showErrorToast, setShowErrorToast] = useState(false);
-  const [errorToastMessage, setErrorToastMessage] = useState<string>('');
 
   const categoryOptions = [
     { value: 'LAPTOP', label: 'Laptop' },
@@ -75,7 +73,7 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
       });
       
       // Show success message
-      setShowSuccess(true);
+      toast.success('Asset registered successfully!');
       
       // Redirect to staff dashboard after 2 seconds
       setTimeout(() => {
@@ -96,9 +94,7 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
       }
       
       // Show error toast
-      setErrorToastMessage(errorMessage);
-      setShowErrorToast(true);
-      setTimeout(() => setShowErrorToast(false), 5000);
+      toast.error(errorMessage);
       
       setError(errorMessage);
     } finally {
@@ -109,22 +105,6 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6">
       <div className="max-w-2xl mx-auto">
-        {/* Success Toast */}
-        {showSuccess && (
-          <div className="fixed top-4 right-4 z-50 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-            <CheckCircle size={20} />
-            <span className="font-medium">Asset registered successfully!</span>
-          </div>
-        )}
-
-        {/* Error Toast */}
-        {showErrorToast && (
-          <div className="fixed top-4 right-4 z-50 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-            <X size={20} />
-            <span className="font-medium">{errorToastMessage}</span>
-          </div>
-        )}
-
         {/* Header */}
         <div className="mb-8">
           <button 
