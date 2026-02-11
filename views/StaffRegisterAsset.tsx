@@ -22,6 +22,8 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string>('');
   const [imageError, setImageError] = useState<string>('');
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const [errorToastMessage, setErrorToastMessage] = useState<string>('');
 
   const categoryOptions = [
     { value: 'LAPTOP', label: 'Laptop' },
@@ -93,6 +95,11 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
         errorMessage = err.message;
       }
       
+      // Show error toast
+      setErrorToastMessage(errorMessage);
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 5000);
+      
       setError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -107,6 +114,14 @@ export const StaffRegisterAsset = ({ qrCode = 'QR-807182-623', qrId, alreadyAssi
           <div className="fixed top-4 right-4 z-50 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
             <CheckCircle size={20} />
             <span className="font-medium">Asset registered successfully!</span>
+          </div>
+        )}
+
+        {/* Error Toast */}
+        {showErrorToast && (
+          <div className="fixed top-4 right-4 z-50 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <X size={20} />
+            <span className="font-medium">{errorToastMessage}</span>
           </div>
         )}
 

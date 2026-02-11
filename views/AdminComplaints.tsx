@@ -238,8 +238,9 @@ export const AdminComplaints = () => {
                             <div key={complaint.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-start justify-between gap-6 transition-colors duration-200">
                                 <div className="flex-1 space-y-3">
                                     <div className="flex items-center gap-3">
-                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${complaint.status === 'Pending'
-                                                ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'
+                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
+                                            complaint.status === 'Pending' || complaint.status === 'PENDING'
+                                                ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
                                                 : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
                                             }`}>
                                             {complaint.status}
