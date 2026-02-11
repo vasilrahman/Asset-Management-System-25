@@ -281,13 +281,16 @@ export const AdminVerified = () => {
                                       </span>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${
-                                          log.assetStatus === 'Active' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
-                                          log.assetStatus === 'Maintenance' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
-                                          log.assetStatus === 'Retired' ? 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300' :
-                                          log.assetStatus === 'Lost' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${
+                                          log.assetStatus === 'Active' || log.assetStatus === 'ACTIVE' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
+                                          log.assetStatus === 'Maintenance' || log.assetStatus === 'MAINTENANCE' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                          log.assetStatus === 'Retired' || log.assetStatus === 'RETIRED' ? 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300' :
+                                          log.assetStatus === 'Lost' || log.assetStatus === 'LOST' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
                                           'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300'
                                       }`}>
+                                          {(log.assetStatus === 'Active' || log.assetStatus === 'ACTIVE') && (
+                                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400"></span>
+                                          )}
                                           {log.assetStatus || 'N/A'}
                                       </span>
                                   </td>
