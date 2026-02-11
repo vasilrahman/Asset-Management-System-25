@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle, Clock, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Complaint } from '../types';
 import { fetchComplaints } from '../services/dashboardService';
 
@@ -9,6 +9,7 @@ export const AdminComplaints = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [resolvingId, setResolvingId] = useState<string | null>(null);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
@@ -255,6 +256,20 @@ export const AdminComplaints = () => {
                                         <span className="font-semibold text-slate-700 dark:text-slate-300">Reported by:</span>
                                         <span>{complaint.reportedBy}</span>
                                     </div>
+                                    {complaint.imageUrl && (
+                                        <div className="mt-3">
+                                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Evidence:</p>
+                                            <img 
+                                                src={complaint.imageUrl} 
+                                                alt="Complaint Evidence" 
+                                                className="rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm max-w-xs h-32 object-cover hover:scale-105 transition-transform cursor-pointer"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedImage(complaint.imageUrl!);
+                                                }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex flex-col gap-3 min-w-[140px]">
@@ -341,6 +356,29 @@ export const AdminComplaints = () => {
                     </div>
                 )}
             </>
+            )}
+
+            {/* Image Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        <img 
+                            src={selectedImage} 
+                            alt="Complaint Evidence" 
+                            className="w-full h-full object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

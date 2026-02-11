@@ -23,6 +23,7 @@ export const StaffModule = () => {
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const [scannedQRData, setScannedQRData] = useState<{ qrId: string; qrCode: string; alreadyAssigned?: boolean } | null>(null);
     const [complaintText, setComplaintText] = useState('');
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     // History View State
     const [historyTab, setHistoryTab] = useState<'VERIFIED' | 'COMPLAINTS'>('VERIFIED');
@@ -426,12 +427,13 @@ export const StaffModule = () => {
     // 1. Staff Home
     if (view === 'HOME') {
         return (
-            <div className="p-6 space-y-8 animate-in fade-in duration-300">
-                {toast && <Toast message={toast.message} type={toast.type} />}
-                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
-                    <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
-                    <p className="text-indigo-100 font-light">What would you like to do today?</p>
-                </div>
+            <>
+                <div className="p-6 space-y-8 animate-in fade-in duration-300">
+                    {toast && <Toast message={toast.message} type={toast.type} />}
+                    <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
+                        <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
+                        <p className="text-indigo-100 font-light">What would you like to do today?</p>
+                    </div>
 
                 {/* 2-2-1 Grid Layout */}
                 {/* 2-2-1 Grid Layout */}
@@ -469,6 +471,30 @@ export const StaffModule = () => {
                     />
                 </div>
             </div>
+            
+            {/* Image Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        <img 
+                            src={selectedImage} 
+                            alt="Complaint Evidence" 
+                            className="w-full h-full object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+            </>
         );
     }
 
@@ -829,8 +855,13 @@ export const StaffModule = () => {
                                         </p>
                                         {complaint.imageUrl && (
                                             <div className="mt-3">
-                                                <p className="text-xs font-semibold text-slate-500 mb-1">Evidence:</p>
-                                                <img src={complaint.imageUrl} alt="Evidence" className="h-24 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
+                                                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Evidence:</p>
+                                                <img 
+                                                    src={complaint.imageUrl} 
+                                                    alt="Complaint Evidence" 
+                                                    className="rounded-lg object-cover border border-slate-200 dark:border-slate-700 shadow-sm w-full max-w-[200px] h-32 hover:scale-105 transition-transform cursor-pointer"
+                                                    onClick={() => setSelectedImage(complaint.imageUrl!)}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -839,6 +870,29 @@ export const StaffModule = () => {
                         </>
                     )}
                 </div>
+                
+                {/* Image Modal */}
+                {selectedImage && (
+                    <div 
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setSelectedImage(null)}
+                    >
+                        <div className="relative max-w-4xl max-h-[90vh] w-full">
+                            <button
+                                onClick={() => setSelectedImage(null)}
+                                className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                            <img 
+                                src={selectedImage} 
+                                alt="Complaint Evidence" 
+                                className="w-full h-full object-contain rounded-lg"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -921,7 +975,34 @@ export const StaffModule = () => {
         );
     }
 
-    return null;
+    return (
+        <>
+            {toast && <Toast message={toast.message} type={toast.type} />}
+            
+            {/* Image Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        <img 
+                            src={selectedImage} 
+                            alt="Complaint Evidence" 
+                            className="w-full h-full object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+        </>
+    );
 };
 
 const DashboardTile = ({ icon, title, subtitle, color, onClick, isPrimary, fullWidth }: any) => (
