@@ -704,7 +704,7 @@ export const StaffModule = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <InfoCard label="Serial" value={selectedAsset.serialNumber} />
                             <InfoCard label="Category" value={selectedAsset.category} />
-                            <InfoCard label="Location" value={selectedAsset.location} />
+                            <InfoCard label="Created At" value={selectedAsset.createdAt ? new Date(selectedAsset.createdAt).toLocaleDateString() : 'N/A'} />
                             <InfoCard label="Last Verified" value={selectedAsset.lastVerifiedDate ? new Date(selectedAsset.lastVerifiedDate).toLocaleDateString() : 'Never'} />
                         </div>
                     </div>
