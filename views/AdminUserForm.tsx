@@ -1,43 +1,186 @@
 
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../context/AppContext';
 import { User } from '../types';
-import { User as UserIcon, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { User as UserIcon, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
+import { useApp } from '../context/AppContext';
 
 export const AdminUserForm = () => {
-  const { addUser, updateUser, navigate, users, currentRoute } = useApp();
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [loadingUser, setLoadingUser] = useState(false);
+  const { navigate, currentRoute } = useApp();
   
   // User State - removed random avatarUrl default
   const [userData, setUserData] = useState<Partial<User>>({
       name: '', username: '', password: '', email: '', phone: '', designation: '', role: 'STAFF', isActive: true, avatarUrl: ''
   });
 
-  useEffect(() => {
-    // Check if we are in Edit mode
-    if (currentRoute.path === '/users/edit' && currentRoute.params?.id) {
-        const foundUser = users.find(u => u.id === currentRoute.params.id);
-        if (foundUser) {
-            setEditUserId(foundUser.id);
-            setUserData(foundUser);
-        }
-    }
-  }, [currentRoute, users]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Check if we are in Edit mode and load user data
+  useEffect(() => {
+    const pathParts = currentRoute.path.split('/');
+    const userId = pathParts[pathParts.length - 1];
+    
+    if (currentRoute.path.includes('/users/edit/') && userId) {
+      setEditUserId(userId);
+      loadUserData(userId);
+    } else {
+      setEditUserId(null);
+    }
+  }, [currentRoute]);
+
+  const loadUserData = async (userId: string) => {
+    setLoadingUser(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      const response = await fetch(`${apiBaseUrl}/admin/users`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
+      }
+
+      const users = await response.json();
+      const user = users.find((u: any) => u.id === userId);
+      
+      if (user) {
+        setUserData({
+          name: user.fullName || '',
+          username: user.username || '',
+          password: '', // Don't load password
+          email: user.email || '',
+          phone: user.phone || '',
+          designation: user.designation || '',
+          role: user.role || 'STAFF',
+          isActive: user.isActive ?? true,
+          avatarUrl: user.avatarUrl || ''
+        });
+      } else {
+        throw new Error('User not found');
+      }
+    } catch (err) {
+      console.error('Failed to load user:', err);
+      setErrors({ submit: 'Failed to load user data' });
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!userData.name?.trim()) newErrors.name = 'Full name is required';
+    if (!userData.designation?.trim()) newErrors.designation = 'Designation is required';
+    if (!userData.email?.trim()) newErrors.email = 'Email is required';
+    if (!userData.phone?.trim()) newErrors.phone = 'Phone number is required';
+    if (!userData.username?.trim()) newErrors.username = 'Username is required';
+    if (!editUserId && !userData.password?.trim()) newErrors.password = 'Password is required';
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (userData.email && !emailRegex.test(userData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    // Phone validation (basic)
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    if (userData.phone && !phoneRegex.test(userData.phone.replace(/[\s\-\(\)\.]/g, ''))) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editUserId) {
-        updateUser(editUserId, userData);
-        alert('User updated successfully');
-    } else {
-        const id = `u-${Date.now()}`;
-        addUser({ ...userData, id } as User);
-        alert('User created successfully');
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      
+      const requestBody: any = {
+        fullName: userData.name,
+        username: userData.username,
+        email: userData.email,
+        phone: userData.phone,
+        designation: userData.designation,
+        role: userData.role,
+        isActive: userData.isActive,
+      };
+
+      // Only include password if it's provided
+      if (userData.password) {
+        requestBody.password = userData.password;
+      }
+
+      const url = editUserId 
+        ? `${apiBaseUrl}/admin/users/${editUserId}`
+        : `${apiBaseUrl}/admin/users`;
+      
+      const method = editUserId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 409) {
+          // Duplicate username or email
+          throw new Error(errorData.message || 'Username or Email already exists');
+        }
+        throw new Error(errorData.message || `Failed to ${editUserId ? 'update' : 'create'} user`);
+      }
+
+      // Show success toast
+      setShowSuccessToast(true);
+      
+      if (!editUserId) {
+        // Reset form for new user
+        setUserData({
+          name: '', username: '', password: '', email: '', phone: '', designation: '', role: 'STAFF', isActive: true, avatarUrl: ''
+        });
+      }
+      setErrors({});
+
+      // Redirect after a short delay
+      setTimeout(() => {
+        setShowSuccessToast(false);
+        navigate('/users');
+      }, 2000);
+
+    } catch (err) {
+      console.error(`Failed to ${editUserId ? 'update' : 'create'} user:`, err);
+      setErrors({ submit: err instanceof Error ? err.message : `Failed to ${editUserId ? 'update' : 'create'} user` });
+    } finally {
+      setIsSubmitting(false);
     }
-    navigate('/users');
   };
 
   const roleOptions = [
@@ -46,16 +189,33 @@ export const AdminUserForm = () => {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-       <div className="flex items-center gap-4">
-            <button onClick={() => navigate('/users')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
-                <ArrowLeft size={24} />
-            </button>
-            <div>
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{editUserId ? 'Edit User' : 'Add New User'}</h1>
-                <p className="text-slate-500 dark:text-slate-400 text-sm">{editUserId ? 'Update user details and permissions.' : 'Create a new account for a staff member or admin.'}</p>
-            </div>
-       </div>
+    <div className="max-w-3xl mx-auto space-y-6 relative">
+       {/* Success Toast */}
+       {showSuccessToast && (
+         <div className="fixed top-4 right-4 z-50 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+           <CheckCircle size={20} />
+           <span className="font-medium">User {editUserId ? 'updated' : 'created'} successfully!</span>
+         </div>
+       )}
+
+       {/* Loading State */}
+       {loadingUser && (
+         <div className="bg-white dark:bg-slate-800 p-12 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm text-center transition-colors duration-200">
+           <div className="text-lg text-slate-600 dark:text-slate-400">Loading user data...</div>
+         </div>
+       )}
+
+       {!loadingUser && (
+         <>
+           <div className="flex items-center gap-4">
+                <button onClick={() => navigate('/users')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
+                    <ArrowLeft size={24} />
+                </button>
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white">{editUserId ? 'Edit User' : 'Add New User'}</h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">{editUserId ? 'Update user details and permissions.' : 'Create a new account for a staff member or admin.'}</p>
+                </div>
+           </div>
 
        <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 p-8 space-y-8 overflow-visible">
            <div className="space-y-6">
@@ -79,10 +239,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.name}
                                 onChange={e => setUserData({...userData, name: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.name ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="John Doe"
                             />
                         </div>
+                        {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                     </div>
 
                     <div>
@@ -92,10 +255,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.designation}
                                 onChange={e => setUserData({...userData, designation: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.designation ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="e.g. IT Manager"
                             />
                         </div>
+                        {errors.designation && <p className="text-red-500 text-xs mt-1">{errors.designation}</p>}
                     </div>
 
                     <div>
@@ -106,10 +272,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.email}
                                 onChange={e => setUserData({...userData, email: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.email ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="john@company.com"
                             />
                         </div>
+                        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                     </div>
 
                     <div>
@@ -119,10 +288,13 @@ export const AdminUserForm = () => {
                                 required
                                 value={userData.phone}
                                 onChange={e => setUserData({...userData, phone: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.phone ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
                                 placeholder="+1 555 000 0000"
                             />
                         </div>
+                        {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                     </div>
 
                     <div>
@@ -131,26 +303,34 @@ export const AdminUserForm = () => {
                             required
                             value={userData.username}
                             onChange={e => setUserData({...userData, username: e.target.value})}
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
+                            className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                              errors.username ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                            }`} 
                             placeholder="johndoe"
                         />
+                        {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">Password</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">
+                          Password {editUserId && <span className="text-xs text-slate-400">(leave empty to keep current)</span>}
+                        </label>
                         <div className="relative">
                             <input 
                                 type={showPassword ? 'text' : 'password'}
                                 required={!editUserId} // Only required for new users
                                 value={userData.password}
                                 onChange={e => setUserData({...userData, password: e.target.value})}
-                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-4 pr-12 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100" 
-                                placeholder="••••••••"
+                                className={`w-full bg-slate-50 dark:bg-slate-900 border p-3 pl-4 pr-12 rounded-xl focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 focus:border-indigo-500 outline-none transition-all dark:text-slate-100 ${
+                                  errors.password ? 'border-red-300 dark:border-red-600' : 'border-slate-200 dark:border-slate-700'
+                                }`} 
+                                placeholder={editUserId ? "Enter new password to change" : "••••••••"}
                             />
                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
+                        {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                     </div>
 
                     <div>
@@ -161,29 +341,33 @@ export const AdminUserForm = () => {
                             options={roleOptions} 
                         />
                     </div>
-
-                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/30 rounded-2xl border border-slate-200 dark:border-slate-700">
-                        <div>
-                            <span className="font-bold text-slate-800 dark:text-white block">Account Status</span>
-                            <span className="text-xs text-slate-400 dark:text-slate-500">Enable or disable login access</span>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" className="sr-only peer" checked={userData.isActive} onChange={() => setUserData({...userData, isActive: !userData.isActive})} />
-                            <div className="w-11 h-6 bg-slate-200 dark:bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-100 dark:peer-focus:ring-indigo-900 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                        </label>
-                    </div>
                 </div>
            </div>
 
            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-700">
+               {errors.submit && (
+                 <div className="flex-1 text-red-500 text-sm bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-200 dark:border-red-800">
+                   {errors.submit}
+                 </div>
+               )}
                <button type="button" onClick={() => navigate('/users')} className="px-6 py-3 text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
                    Cancel
                </button>
-               <button type="submit" className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">
-                   {editUserId ? 'Update User' : 'Create User'}
+               <button 
+                 type="submit" 
+                 disabled={isSubmitting}
+                 className={`px-8 py-3 font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-colors ${
+                   isSubmitting 
+                     ? 'bg-indigo-400 cursor-not-allowed text-white' 
+                     : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                 }`}
+               >
+                 {isSubmitting ? (editUserId ? 'Updating User...' : 'Creating User...') : (editUserId ? 'Update User' : 'Create User')}
                </button>
            </div>
        </form>
+         </>
+       )}
     </div>
   );
 };

@@ -1,12 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Search, ArrowRight, Calendar, ChevronDown, Package, Laptop, Camera, Smartphone, Tablet } from 'lucide-react';
+import { Search, ArrowRight, Calendar, ChevronDown, Package, Laptop, Camera, Smartphone, Tablet, Download, FileSpreadsheet, FileText } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
+import { fetchAssets, fetchAssetsForExport } from '../services/assetService';
+import { Asset } from '../types';
 
 export const AdminAssets = () => {
-  const { assets, navigate } = useApp();
+  const { navigate } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   
   // Filters (Removed QR Status)
   const [filterCategory, setFilterCategory] = useState<string>('All');
@@ -15,32 +18,58 @@ export const AdminAssets = () => {
   const [dateEnd, setDateEnd] = useState('');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
   
+  // Export
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
 
-  // Filter Logic
-  const filteredAssets = assets.filter(asset => {
-    // Text Search
-    const matchesSearch = 
-        asset.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        asset.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Dropdown Filters
-    const matchesCategory = filterCategory === 'All' || asset.category === filterCategory;
-    const matchesStatus = filterStatus === 'All' || asset.status === filterStatus;
-    
-    // Date Range Filter
-    let matchesDate = true;
-    if (dateStart && asset.createdDate < dateStart) matchesDate = false;
-    if (dateEnd && asset.createdDate > dateEnd) matchesDate = false;
+  // Data
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-    return matchesSearch && matchesCategory && matchesStatus && matchesDate;
-  });
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
-  const currentAssets = filteredAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // Fetch data
+  useEffect(() => {
+    const loadAssets = async () => {
+      setLoading(true);
+      try {
+        const response = await fetchAssets({
+          search: debouncedSearch,
+          category: filterCategory,
+          status: filterStatus,
+          startDate: dateStart,
+          endDate: dateEnd,
+          page: currentPage,
+          limit: itemsPerPage,
+        });
+        setAssets(response.data || []);
+        setTotal(response.meta?.total || 0);
+        setTotalPages(response.meta?.totalPages || 0);
+      } catch (error) {
+        console.error('Failed to fetch assets:', error);
+        setAssets([]);
+        setTotal(0);
+        setTotalPages(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAssets();
+  }, [debouncedSearch, filterCategory, filterStatus, dateStart, dateEnd, currentPage]);
+
+  const currentAssets = assets;
 
   const categoryOptions = [
     { value: 'All', label: 'Category: All' },
@@ -58,6 +87,123 @@ export const AdminAssets = () => {
       { value: 'Retired', label: 'Retired' },
       { value: 'Lost', label: 'Lost' },
   ];
+
+  const handleExport = async (format: 'excel' | 'pdf') => {
+    setIsExporting(true);
+    setIsExportDropdownOpen(false);
+    
+    try {
+      const response = await fetchAssetsForExport({
+        search: debouncedSearch,
+        category: filterCategory,
+        status: filterStatus,
+        startDate: dateStart,
+        endDate: dateEnd,
+      });
+
+      // Handle different response structures
+      let exportData = response;
+      if (response && typeof response === 'object') {
+        if (Array.isArray(response.data)) {
+          exportData = response.data;
+        } else if (Array.isArray(response)) {
+          exportData = response;
+        }
+      }
+
+      // Validate data is an array
+      if (!Array.isArray(exportData)) {
+        console.error('Invalid export data format:', response);
+        throw new Error('Invalid data format received from server');
+      }
+
+      if (exportData.length === 0) {
+        alert('No data to export');
+        setIsExporting(false);
+        return;
+      }
+
+      if (format === 'excel') {
+        await exportToExcel(exportData);
+      } else {
+        await exportToPDF(exportData);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToExcel = async (data: any[]) => {
+    // Dynamic import to reduce bundle size
+    const XLSX = await import('xlsx');
+    
+    const worksheetData = data.map((asset) => ({
+      'QR Code': asset.qrCode || asset.qrCode === null ? asset.qrCode || 'Not Assigned' : 'Not Assigned',
+      'Asset Name': asset.name || 'N/A',
+      'Category': asset.category || 'N/A',
+      'Serial Number': asset.serialNumber || 'N/A',
+      'Status': asset.status || 'N/A',
+      'Location': asset.location || 'N/A',
+      'Last Verified': asset.lastVerifiedAt ? new Date(asset.lastVerifiedAt).toLocaleDateString() : 'Never',
+      'Created Date': asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : 'N/A',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
+    
+    // Auto-size columns
+    const maxWidth = 30;
+    const colWidths = Object.keys(worksheetData[0] || {}).map(key => ({
+      wch: Math.min(Math.max(key.length, 10), maxWidth)
+    }));
+    worksheet['!cols'] = colWidths;
+
+    const fileName = `assets-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const exportToPDF = async (data: any[]) => {
+    // Dynamic import to reduce bundle size
+    const { jsPDF } = await import('jspdf');
+    const autoTable = (await import('jspdf-autotable')).default;
+    
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(18);
+    doc.text('Asset Management Report', 14, 20);
+    
+    // Export date
+    doc.setFontSize(10);
+    doc.text(`Exported on: ${new Date().toLocaleString()}`, 14, 28);
+    
+    // Table
+    const tableData = data.map((asset) => [
+      asset.qrCode || 'Not Assigned',
+      asset.name || 'N/A',
+      asset.category || 'N/A',
+      asset.serialNumber || 'N/A',
+      asset.status || 'N/A',
+      asset.location || 'N/A',
+      asset.lastVerifiedAt ? new Date(asset.lastVerifiedAt).toLocaleDateString() : 'Never',
+    ]);
+
+    autoTable(doc, {
+      head: [['QR Code', 'Name', 'Category', 'Serial', 'Status', 'Location', 'Last Verified']],
+      body: tableData,
+      startY: 35,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [79, 70, 229], textColor: 255 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    const fileName = `assets-export-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  };
 
   return (
     <div className="space-y-6">
@@ -137,7 +283,7 @@ export const AdminAssets = () => {
                     {isDateDropdownOpen && <div className="fixed inset-0 z-10" onClick={() => setIsDateDropdownOpen(false)}></div>}
                 </div>
             </div>
-        </div>
+          </div>
       </div>
 
       {/* Asset Grid/Table */}
@@ -152,7 +298,20 @@ export const AdminAssets = () => {
               <div className="col-span-2 text-right">Actions</div>
           </div>
 
-          {currentAssets.map(asset => (
+          {loading ? (
+              <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700">
+                  <div className="text-lg text-slate-600 dark:text-slate-400">Loading assets...</div>
+              </div>
+          ) : currentAssets.length === 0 ? (
+              <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Search className="text-slate-300 dark:text-slate-500" size={24} />
+                  </div>
+                  <h3 className="text-slate-800 dark:text-slate-200 font-medium">No assets found</h3>
+                  <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Try adjusting your search or filters</p>
+              </div>
+          ) : (
+              currentAssets.map(asset =>
               <div key={asset.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all group flex flex-col md:grid md:grid-cols-12 items-center gap-4">
                   
                   {/* Thumbnail Image */}
@@ -169,7 +328,9 @@ export const AdminAssets = () => {
                   {/* Asset Name - Updated ID format - REMOVED font-mono */}
                   <div className="col-span-3 w-full text-center md:text-left">
                       <h4 className="font-semibold text-slate-800 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{asset.name}</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">ID: {asset.id}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                        QR: {asset.qrCode || 'Not Assigned'}
+                      </p>
                   </div>
                   
                   {/* Category */}
@@ -188,13 +349,17 @@ export const AdminAssets = () => {
                   <div className="col-span-2 w-full flex md:block justify-between">
                       <span className="md:hidden text-sm text-slate-400">Status:</span>
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
-                          asset.status === 'Active' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
-                          asset.status === 'Maintenance' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800' :
+                          asset.status?.toUpperCase() === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800' : 
+                          asset.status?.toUpperCase() === 'MAINTENANCE' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800' :
+                          asset.status?.toUpperCase() === 'RETIRED' ? 'bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600' :
+                          asset.status?.toUpperCase() === 'LOST' ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800' :
                           'bg-slate-50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'
                       }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${
-                              asset.status === 'Active' ? 'bg-emerald-500' : 
-                              asset.status === 'Maintenance' ? 'bg-amber-500' : 'bg-slate-400'
+                              asset.status?.toUpperCase() === 'ACTIVE' ? 'bg-emerald-500' : 
+                              asset.status?.toUpperCase() === 'MAINTENANCE' ? 'bg-amber-500' : 
+                              asset.status?.toUpperCase() === 'RETIRED' ? 'bg-slate-400' :
+                              asset.status?.toUpperCase() === 'LOST' ? 'bg-red-500' : 'bg-slate-400'
                           }`}></span>
                           {asset.status}
                       </span>
@@ -207,22 +372,51 @@ export const AdminAssets = () => {
                       </button>
                   </div>
               </div>
-          ))}
-
-           {currentAssets.length === 0 && (
-              <div className="p-12 text-center bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
-                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Search className="text-slate-300 dark:text-slate-500" size={24} />
-                  </div>
-                  <h3 className="text-slate-800 dark:text-slate-200 font-medium">No assets found</h3>
-                  <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Try adjusting your search or filters</p>
-              </div>
+              )
           )}
       </div>
         
       {/* Pagination */}
       <div className="flex justify-between items-center pt-4">
+            {/* Export Button - Bottom Left */}
+            <div className="relative">
+              <button
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                disabled={isExporting}
+                className={`flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all ${
+                  isExporting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Download size={18} />
+                {isExporting ? 'Exporting...' : 'Export'}
+                {!isExporting && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
+              </button>
+
+              {isExportDropdownOpen && !isExporting && (
+                <div className="absolute left-0 bottom-full mb-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
+                  <button
+                    onClick={() => handleExport('excel')}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 transition-colors"
+                  >
+                    <FileSpreadsheet size={16} />
+                    Export as Excel
+                  </button>
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
+                  >
+                    <FileText size={16} />
+                    Export as PDF
+                  </button>
+                </div>
+              )}
+              {isExportDropdownOpen && !isExporting && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
+            </div>
+
+            {/* Page Info - Centered */}
             <span className="text-sm text-slate-400 dark:text-slate-500 font-medium">Page {currentPage} of {totalPages}</span>
+
+            {/* Navigation Buttons */}
             <div className="flex gap-2">
                 <button 
                     disabled={currentPage === 1}

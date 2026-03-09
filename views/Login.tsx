@@ -1,28 +1,33 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { User } from '../types';
 import { Lock, User as UserIcon, ArrowRight } from 'lucide-react';
 
 export const Login = () => {
-  const { users, login } = useApp();
+  const { navigate } = useApp();
+  const { login: authLogin } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const foundUser = users.find(
-      (u) => u.username === username && u.password === password
-    );
+    setLoading(true);
+    setError('');
 
-    if (foundUser) {
-        if (!foundUser.isActive) {
-            setError('Account is inactive. Contact admin.');
-            return;
-        }
-      login(foundUser);
-    } else {
-      setError('Invalid username or password');
+    try {
+      const loggedUser = await authLogin(username, password);
+      if (loggedUser.role === 'ADMIN') {
+        navigate('/dashboard');
+      } else if (loggedUser.role === 'STAFF') {
+        navigate('/staff/home');
+      }
+    } catch (err) {
+      setError('Invalid credentials');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,7 +36,7 @@ export const Login = () => {
       {/* Left Side - Image */}
       <div className="hidden lg:flex w-1/2 relative overflow-hidden bg-slate-900">
         <img 
-            src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" 
+            // src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80" 
             alt="Architecture" 
             className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay"
         />
@@ -113,9 +118,10 @@ export const Login = () => {
 
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-4 px-4 rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-medium py-4 px-4 rounded-xl shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
             >
-              Sign In <ArrowRight size={18} />
+              {loading ? 'Signing In...' : 'Sign In'} <ArrowRight size={18} />
             </button>
           </form>
         </div>

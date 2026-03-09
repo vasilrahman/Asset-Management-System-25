@@ -2,16 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { AssetCategory, AssetStatus } from '../types';
-import { ArrowLeft, QrCode, Image as ImageIcon, Trash2, Package } from 'lucide-react';
+import { ArrowLeft, QrCode, Image as ImageIcon, Trash2, Package, RefreshCw } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { fetchAssetById, updateAsset as updateAssetAPI, regenerateAssetQR } from '../services/assetService';
+import toast from 'react-hot-toast';
 
 export const AdminAssetForm = () => {
   const { navigate, addAsset, updateAsset, assets, currentRoute, currentUser } = useApp();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [editAssetId, setEditAssetId] = useState<string | null>(null);
   const [defaultValues, setDefaultValues] = useState<any>({
       name: '', category: 'Laptop', serialNumber: '', status: 'Active'
@@ -24,21 +27,39 @@ export const AdminAssetForm = () => {
   useEffect(() => {
     // Check if we are in Edit mode
     if (currentRoute.path === '/assets/edit' && currentRoute.params?.id) {
-        const asset = assets.find(a => a.id === currentRoute.params.id);
-        if (asset) {
-            setEditAssetId(asset.id);
+        const assetId = currentRoute.params.id;
+        setEditAssetId(assetId);
+        
+        // Fetch asset details from API
+        const loadAsset = async () => {
+          setIsLoading(true);
+          try {
+            const asset = await fetchAssetById(assetId);
+            // Map API response fields to form fields
             setDefaultValues({
-                name: asset.name,
+                name: asset.assetName || asset.name,
                 category: asset.category,
                 serialNumber: asset.serialNumber,
                 status: asset.status,
             });
-            setSelectedCategory(asset.category);
-            setSelectedStatus(asset.status);
+            // Set category and status (convert to proper case)
+            const categoryValue = asset.category.charAt(0).toUpperCase() + asset.category.slice(1).toLowerCase();
+            const statusValue = asset.status.charAt(0).toUpperCase() + asset.status.slice(1).toLowerCase();
+            setSelectedCategory(categoryValue);
+            setSelectedStatus(statusValue);
             setImagePreview(asset.imageUrl || null);
-        }
+          } catch (error) {
+            console.error('Failed to load asset:', error);
+            toast.error('Failed to load asset details');
+            navigate('/assets');
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        
+        loadAsset();
     }
-  }, [currentRoute, assets]);
+  }, [currentRoute.params?.id]);
 
   const handleBack = () => {
       if (editAssetId) {
@@ -82,11 +103,11 @@ export const AdminAssetForm = () => {
     doc.setFontSize(12);
     
     let y = 60;
-    const addLine = (label: string, value: string) => {
+    const addLine = (label: string, value: string | undefined) => {
         doc.setFont("helvetica", "bold");
         doc.text(label, 20, y);
         doc.setFont("helvetica", "normal");
-        doc.text(value, 70, y);
+        doc.text(value || 'N/A', 70, y);
         y += 10;
     };
 
@@ -95,7 +116,7 @@ export const AdminAssetForm = () => {
     addLine("Category:", asset.category);
     addLine("Serial Number:", asset.serialNumber);
     addLine("Status:", asset.status);
-    addLine("Added By:", asset.addedBy);
+    addLine("Added By:", asset.addedBy || asset.createdBy || 'System');
 
     // REAL QR CODE GENERATION (High Quality)
     try {
@@ -129,29 +150,51 @@ export const AdminAssetForm = () => {
 
     if (editAssetId) {
         // Update Existing
-        const updates: any = {
-            name: formData.get('name') as string,
-            category: selectedCategory as AssetCategory,
-            serialNumber: formData.get('serial') as string,
-            status: selectedStatus as AssetStatus,
-        };
-        
-        if (imagePreview !== assets.find(a => a.id === editAssetId)?.imageUrl) {
-            updates.imageUrl = imageUrl;
-        }
+        try {
+            const updates: any = {
+                name: formData.get('name') as string,
+                category: selectedCategory.toUpperCase(),
+                serialNumber: formData.get('serial') as string,
+                status: selectedStatus.toUpperCase(),
+            };
+            
+            if (imageUrl) {
+                updates.imageUrl = imageUrl;
+            }
 
-        updateAsset(editAssetId, updates);
-        
-        if (action === 'qr') {
-             const asset = assets.find(a => a.id === editAssetId);
-             if (asset) {
-                 await generatePDF({ ...asset, ...updates });
-                 updateAsset(editAssetId, { isQrGenerated: true });
-             }
+            console.log('Updating asset with payload:', updates);
+            const updatedAsset = await updateAssetAPI(editAssetId, updates);
+            console.log('Update successful:', updatedAsset);
+            
+            // Update local context
+            updateAsset(editAssetId, updates);
+            
+            if (action === 'qr') {
+                try {
+                    // Call API to regenerate QR
+                    console.log('Calling regenerate QR API...');
+                    const qrData = await regenerateAssetQR(editAssetId);
+                    console.log('QR regeneration successful:', qrData);
+                    
+                    // Generate and download PDF with updated QR
+                    await generatePDF({ ...updatedAsset, ...updates, qrCode: qrData.qrCode });
+                    
+                    toast.success('Asset updated and QR code regenerated successfully');
+                } catch (qrError) {
+                    console.error('Failed to regenerate QR:', qrError);
+                    toast.error('Asset updated but QR regeneration failed.');
+                }
+            } else {
+                toast.success('Asset updated successfully');
+            }
+            
+            navigate('/assets/detail', { id: editAssetId });
+        } catch (error: any) {
+            console.error('Failed to update asset:', error);
+            console.error('Error response:', error?.response?.data);
+            const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update asset. Please try again.';
+            toast.error(errorMessage);
         }
-        
-        alert("Asset updated successfully.");
-        navigate('/assets/detail', { id: editAssetId });
 
     } else {
         // Create New
@@ -203,6 +246,27 @@ export const AdminAssetForm = () => {
       { value: 'Maintenance', label: 'Maintenance' },
       { value: 'Retired', label: 'Retired' },
   ];
+
+  // Show loading state while fetching asset data
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 pb-20">
+        <div className="flex items-center gap-4">
+          <button onClick={handleBack} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500 dark:text-slate-400 transition-colors">
+            <ArrowLeft size={24} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Edit Asset</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Update asset details.</p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 p-12 flex flex-col items-center justify-center">
+          <RefreshCw className="animate-spin text-indigo-600 mb-4" size={32} />
+          <p className="text-slate-600 dark:text-slate-400">Loading asset details...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
@@ -310,18 +374,20 @@ export const AdminAssetForm = () => {
                 <button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-medium rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm transition-colors"
+                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-colors"
                 >
-                    {editAssetId ? 'Save Changes' : 'Submit'}
+                    {isSubmitting ? 'Processing...' : (editAssetId ? 'Save Changes' : 'Submit')}
                 </button>
-                <button 
-                    type="submit" 
-                    data-action="qr"
-                    disabled={isSubmitting}
-                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition-colors"
-                >
-                    {isSubmitting ? 'Processing...' : <><QrCode size={18} /> {editAssetId ? 'Save & Re-generate QR' : 'Generate QR & Submit'}</>}
-                </button>
+                {!editAssetId && (
+                    <button 
+                        type="submit" 
+                        data-action="qr"
+                        disabled={isSubmitting}
+                        className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition-colors"
+                    >
+                        {isSubmitting ? 'Processing...' : <><QrCode size={18} /> Generate QR & Submit</>}
+                    </button>
+                )}
             </div>
         </form>
     </div>

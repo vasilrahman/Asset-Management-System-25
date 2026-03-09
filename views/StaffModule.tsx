@@ -5,14 +5,26 @@ import { Asset, AssetCategory, AssetStatus } from '../types';
 import { QrCode, Box, ClipboardCheck, AlertTriangle, ChevronLeft, Camera, Check, Search, X, Package, Tag, Save, RefreshCw, Image as ImageIcon, ScanLine } from 'lucide-react';
 import { CustomSelect } from '../components/CustomSelect';
 import jsQR from 'jsqr';
+import { StaffRegisterAsset } from './StaffRegisterAsset';
+import { verifyQRCode } from '../services/dashboardService';
+import { verifyStaffAsset, submitStaffComplaint, fetchStaffAssets, fetchStaffVerifiedHistory, fetchStaffComplaintsHistory } from '../services/assetService';
+import toast from 'react-hot-toast';
 
-type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM';
+type ViewState = 'HOME' | 'SCANNER' | 'ASSETS' | 'VERIFIED' | 'COMPLAINT' | 'DETAIL' | 'REGISTER_FORM' | 'REGISTER_ASSET';
 
 export const StaffModule = () => {
-    const { assets, logs, verifyAsset, currentUser, addComplaint, registerAsset } = useApp();
+    const { verifyAsset, currentUser, addComplaint, registerAsset } = useApp();
+    const [staffAssets, setStaffAssets] = useState<Asset[]>([]);
+    const [isLoadingAssets, setIsLoadingAssets] = useState(false);
+    const [verifiedHistory, setVerifiedHistory] = useState<any[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [complaintsHistory, setComplaintsHistory] = useState<any[]>([]);
+    const [isLoadingComplaints, setIsLoadingComplaints] = useState(false);
     const [view, setView] = useState<ViewState>('HOME');
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+    const [scannedQRData, setScannedQRData] = useState<{ qrId: string; qrCode: string; alreadyAssigned?: boolean } | null>(null);
     const [complaintText, setComplaintText] = useState('');
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     // History View State
     const [historyTab, setHistoryTab] = useState<'VERIFIED' | 'COMPLAINTS'>('VERIFIED');
@@ -39,71 +51,189 @@ export const StaffModule = () => {
 
     // Scanner Mode: 'VERIFY' or 'REGISTER'
     const [scannerMode, setScannerMode] = useState<'VERIFY' | 'REGISTER'>('VERIFY');
+    const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
+
+    // Fetch staff assets when ASSETS view is opened
+    useEffect(() => {
+        if (view === 'ASSETS') {
+            setIsLoadingAssets(true);
+            fetchStaffAssets()
+                .then(data => {
+                    setStaffAssets(data);
+                })
+                .catch(error => {
+                    console.error('Failed to fetch staff assets:', error);
+                    toast.error('Failed to load assets');
+                    setStaffAssets([]);
+                })
+                .finally(() => {
+                    setIsLoadingAssets(false);
+                });
+        } else {
+            // Reset assets when leaving ASSETS view
+            setStaffAssets([]);
+            setAssetSearch('');
+        }
+    }, [view]);
+
+    // Fetch verified history when VERIFIED view is opened
+    useEffect(() => {
+        if (view === 'VERIFIED' && historyTab === 'VERIFIED') {
+            setIsLoadingHistory(true);
+            fetchStaffVerifiedHistory()
+                .then(data => {
+                    setVerifiedHistory(data);
+                })
+                .catch(error => {
+                    console.error('Failed to fetch verified history:', error);
+                    toast.error('Failed to load history');
+                    setVerifiedHistory([]);
+                })
+                .finally(() => {
+                    setIsLoadingHistory(false);
+                });
+        } else if (view !== 'VERIFIED') {
+            // Reset history when leaving VERIFIED view
+            setVerifiedHistory([]);
+            setComplaintsHistory([]);
+            setHistorySearch('');
+        }
+    }, [view, historyTab]);
+
+    // Fetch complaints history when COMPLAINTS tab is selected
+    useEffect(() => {
+        if (view === 'VERIFIED' && historyTab === 'COMPLAINTS') {
+            setIsLoadingComplaints(true);
+            fetchStaffComplaintsHistory()
+                .then(data => {
+                    setComplaintsHistory(data);
+                })
+                .catch(error => {
+                    console.error('Failed to fetch complaints history:', error);
+                    toast.error('Failed to load complaints');
+                    setComplaintsHistory([]);
+                })
+                .finally(() => {
+                    setIsLoadingComplaints(false);
+                });
+        }
+    }, [view, historyTab]);
 
     // Handle successful scan (string data)
-    const handleScanResult = (data: string) => {
-        let assetId = data;
+    const handleScanResult = async (data: string) => {
         try {
-            const parsed = JSON.parse(data);
-            if (parsed.assetId) {
-                assetId = parsed.assetId;
+            // Call backend API to verify QR code
+            const response = await verifyQRCode(data);
+
+            if (!response.valid) {
+                toast.error(response.message || 'Invalid QR code');
+                return;
             }
-        } catch (e) {
-            // Not JSON, assume raw ID
+
+            // ✅ VERIFY FLOW
+            if (scannerMode === 'VERIFY') {
+                if (!response.alreadyAssigned || !response.asset) {
+                    toast('This QR is not registered yet', { icon: '⚠️' });
+                    return;
+                }
+
+                setSelectedAsset(response.asset);
+                setView('DETAIL');
+                return;
+            }
+
+            // ✅ REGISTER FLOW
+            if (scannerMode === 'REGISTER') {
+                setScannedQRData({
+                    qrId: response.qrId,
+                    qrCode: data,
+                    alreadyAssigned: response.alreadyAssigned
+                });
+
+                setView('REGISTER_ASSET');
+            }
+
+        } catch (error: any) {
+            console.error('QR verification failed:', error);
+            const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify QR code';
+            toast.error(errorMessage);
         }
+    };
 
-        const asset = assets.find(a => a.id === assetId.trim() || a.serialNumber === assetId.trim());
-
-        if (asset) {
-            // Logic for handling Dummy Assets
-            if (asset.isDummy) {
-                if (scannerMode === 'REGISTER') {
-                    setSelectedAsset(asset);
-                    setView('REGISTER_FORM');
-                } else {
-                    if (confirm("This is an unassigned QR code. Do you want to register it?")) {
-                        setScannerMode('REGISTER');
-                        setSelectedAsset(asset);
-                        setView('REGISTER_FORM');
-                    }
+    const handleVerify = async () => {
+        console.log('handleVerify called', { selectedAsset, currentUser });
+        if (selectedAsset) {
+            try {
+                console.log('Calling verifyStaffAsset with:', selectedAsset.id);
+                await verifyStaffAsset(selectedAsset.id);
+                console.log('verifyStaffAsset successful');
+                if (currentUser) {
+                    verifyAsset(selectedAsset.id, currentUser.name);
                 }
-            } else {
-                // Logic for Registered Assets
-                if (scannerMode === 'REGISTER') {
-                    alert("This asset is already registered.");
-                } else {
-                    setSelectedAsset(asset);
-                    setView('DETAIL');
-                }
+                toast.success('Asset verified successfully');
+                setView('HOME');
+            } catch (error: any) {
+                console.error('Failed to verify asset:', error);
+                const errorMessage = error?.response?.data?.message || error?.message || 'Failed to verify asset';
+                toast.error(errorMessage);
             }
         } else {
-            alert(`Asset not found: ${assetId}`);
+            console.log('Missing selectedAsset');
         }
     };
 
-    const handleVerify = () => {
-        if (selectedAsset && currentUser) {
-            verifyAsset(selectedAsset.id, currentUser.name);
-            setView('HOME');
-        }
-    };
-
-    const handleComplaintSubmit = (e: React.FormEvent) => {
+    const handleComplaintSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (selectedAsset && currentUser) {
-            addComplaint({
-                id: `c-${Date.now()}`,
-                assetId: selectedAsset.id,
-                assetName: selectedAsset.name,
-                reportedBy: currentUser.name,
-                date: new Date().toISOString(),
-                description: complaintText,
-                status: 'Pending',
-                imageUrl: complaintImage
-            });
-            setComplaintText('');
-            setComplaintImage('');
-            setView('HOME');
+        console.log('handleComplaintSubmit called', { selectedAsset, currentUser });
+        if (selectedAsset) {
+            setIsSubmittingComplaint(true);
+            try {
+                console.log('Calling submitStaffComplaint with:', {
+                    assetId: selectedAsset.id,
+                    description: complaintText,
+                    imageUrl: complaintImage || undefined
+                });
+                await submitStaffComplaint({
+                    assetId: selectedAsset.id,
+                    description: complaintText,
+                    imageUrl: complaintImage || undefined
+                });
+                console.log('submitStaffComplaint successful');
+                if (currentUser) {
+                    addComplaint({
+                        id: `c-${Date.now()}`,
+                        assetId: selectedAsset.id,
+                        assetName: selectedAsset.name,
+                        reportedBy: currentUser.name,
+                        date: new Date().toISOString(),
+                        description: complaintText,
+                        status: 'Pending',
+                        imageUrl: complaintImage
+                    });
+                }
+                setComplaintText('');
+                setComplaintImage('');
+                toast.success('Issue reported successfully');
+                setView('HOME');
+            } catch (error: any) {
+                console.error('Failed to submit complaint:', error);
+                let errorMessage = 'Failed to report issue';
+                
+                // Handle 413 Payload Too Large error
+                if (error?.response?.status === 413 || error?.message?.includes('413')) {
+                    errorMessage = 'Image size is too large. Please upload a smaller image (max 2MB).';
+                } else if (error?.response?.data?.message) {
+                    errorMessage = error.response.data.message;
+                } else if (error?.message) {
+                    errorMessage = error.message;
+                }
+                
+                toast.error(errorMessage);
+            } finally {
+                setIsSubmittingComplaint(false);
+            }
+        } else {
+            console.log('Missing selectedAsset');
         }
     };
 
@@ -126,6 +256,14 @@ export const StaffModule = () => {
     const handleImageRegisterUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Validate file size (2MB limit)
+            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            if (file.size > maxSize) {
+                toast.error('Image size must be less than 2MB. Please choose a smaller image.');
+                e.target.value = ''; // Reset input
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (ev) => {
                 setRegData(prev => ({ ...prev, imageUrl: ev.target?.result as string }));
@@ -137,6 +275,14 @@ export const StaffModule = () => {
     const handleComplaintImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Validate file size (2MB limit)
+            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            if (file.size > maxSize) {
+                toast.error('Image size must be less than 2MB. Please choose a smaller image.');
+                e.target.value = ''; // Reset input
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (ev) => {
                 setComplaintImage(ev.target?.result as string);
@@ -301,11 +447,12 @@ export const StaffModule = () => {
     // 1. Staff Home
     if (view === 'HOME') {
         return (
-            <div className="p-6 space-y-8 animate-in fade-in duration-300">
-                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
-                    <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
-                    <p className="text-indigo-100 font-light">What would you like to do today?</p>
-                </div>
+            <>
+                <div className="p-6 space-y-8 animate-in fade-in duration-300">
+                    <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-200 dark:shadow-none">
+                        <h1 className="text-3xl font-light mb-1">Hello, <span className="font-semibold">{currentUser?.name.split(' ')[0]}</span></h1>
+                        <p className="text-indigo-100 font-light">What would you like to do today?</p>
+                    </div>
 
                 {/* 2-2-1 Grid Layout */}
                 {/* 2-2-1 Grid Layout */}
@@ -343,10 +490,48 @@ export const StaffModule = () => {
                     />
                 </div>
             </div>
+            
+            {/* Image Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        <img 
+                            src={selectedImage} 
+                            alt="Complaint Evidence" 
+                            className="w-full h-full object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+            </>
         );
     }
 
-    // 2. Scanner View
+    // 2. Register Asset View
+    if (view === 'REGISTER_ASSET') {
+        return (
+            <StaffRegisterAsset 
+                qrCode={scannedQRData?.qrCode || "QR-807182-623"} 
+                qrId={scannedQRData?.qrId}
+                onBack={() => {
+                    setScannedQRData(null);
+                    setView('HOME');
+                }} 
+            />
+        );
+    }
+
+    // 3. Scanner View
     if (view === 'SCANNER') {
         return (
             <div className="fixed inset-0 bg-black text-white z-50 flex flex-col">
@@ -510,7 +695,7 @@ export const StaffModule = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <InfoCard label="Serial" value={selectedAsset.serialNumber} />
                             <InfoCard label="Category" value={selectedAsset.category} />
-                            <InfoCard label="Location" value={selectedAsset.location} />
+                            <InfoCard label="Created At" value={selectedAsset.createdAt ? new Date(selectedAsset.createdAt).toLocaleDateString() : 'N/A'} />
                             <InfoCard label="Last Verified" value={selectedAsset.lastVerifiedDate ? new Date(selectedAsset.lastVerifiedDate).toLocaleDateString() : 'Never'} />
                         </div>
                     </div>
@@ -530,7 +715,7 @@ export const StaffModule = () => {
 
     // 5. Asset List
     if (view === 'ASSETS') {
-        const filteredAssets = assets.filter(a =>
+        const filteredAssets = staffAssets.filter(a =>
             a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
             a.id.toLowerCase().includes(assetSearch.toLowerCase())
         );
@@ -552,24 +737,36 @@ export const StaffModule = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-3 pb-20 pr-1 custom-scrollbar">
-                    {filteredAssets.map(asset => (
-                        <div key={asset.id} onClick={() => { setSelectedAsset(asset); setView('DETAIL'); }} className="bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex gap-4 items-center cursor-pointer active:scale-95 transition-transform">
-                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0 flex items-center justify-center">
-                                {asset.imageUrl ? (
-                                    <img src={asset.imageUrl} className="w-full h-full object-cover" alt={asset.name} />
-                                ) : (
-                                    <Package className="text-slate-400 dark:text-slate-500" size={24} />
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-slate-800 dark:text-white truncate">{asset.name}</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1">{asset.id} • {asset.location}</p>
-                            </div>
-                            <div className="pr-2">
-                                <span className={`w-3 h-3 rounded-full block ${asset.status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                            </div>
+                    {isLoadingAssets ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                            <RefreshCw size={48} className="mb-4 opacity-20 animate-spin" />
+                            <p>Loading assets...</p>
                         </div>
-                    ))}
+                    ) : filteredAssets.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                            <Box size={48} className="mb-4 opacity-20" />
+                            <p>{assetSearch ? 'No assets found' : 'No assets available'}</p>
+                        </div>
+                    ) : (
+                        filteredAssets.map(asset => (
+                            <div key={asset.id} onClick={() => { setSelectedAsset(asset); setView('DETAIL'); }} className="bg-white dark:bg-slate-800 p-3 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex gap-4 items-center cursor-pointer active:scale-95 transition-transform">
+                                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0 flex items-center justify-center">
+                                    {asset.imageUrl ? (
+                                        <img src={asset.imageUrl} className="w-full h-full object-cover" alt={asset.name} />
+                                    ) : (
+                                        <Package className="text-slate-400 dark:text-slate-500" size={24} />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-bold text-slate-800 dark:text-white truncate">{asset.name}</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1">{asset.id} • {asset.location}</p>
+                                </div>
+                                <div className="pr-2">
+                                    <span className={`w-3 h-3 rounded-full block ${asset.status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         );
@@ -577,14 +774,12 @@ export const StaffModule = () => {
 
     // 6. History View (Verified / Complaints)
     if (view === 'VERIFIED') {
-        const filteredLogs = logs.filter(l =>
-            l.verifiedBy === currentUser?.name &&
-            (l.assetName.toLowerCase().includes(historySearch.toLowerCase()) || l.assetId.toLowerCase().includes(historySearch.toLowerCase()))
+        const filteredLogs = verifiedHistory.filter(l =>
+            l.assetName?.toLowerCase().includes(historySearch.toLowerCase()) || l.assetId?.toLowerCase().includes(historySearch.toLowerCase())
         );
 
-        const filteredComplaints = useApp().complaints.filter(c =>
-            c.reportedBy === currentUser?.name &&
-            (c.assetName.toLowerCase().includes(historySearch.toLowerCase()) || c.assetId.toLowerCase().includes(historySearch.toLowerCase()) || c.description.toLowerCase().includes(historySearch.toLowerCase()))
+        const filteredComplaints = complaintsHistory.filter(c =>
+            c.assetName?.toLowerCase().includes(historySearch.toLowerCase()) || c.assetId?.toLowerCase().includes(historySearch.toLowerCase()) || c.description?.toLowerCase().includes(historySearch.toLowerCase())
         );
 
         return (
@@ -624,57 +819,98 @@ export const StaffModule = () => {
                 <div className="space-y-4 overflow-y-auto pb-20 flex-1">
                     {historyTab === 'VERIFIED' ? (
                         <>
-                            {filteredLogs.length === 0 && (
+                            {isLoadingHistory ? (
+                                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                    <RefreshCw size={48} className="mb-4 opacity-20 animate-spin" />
+                                    <p>Loading history...</p>
+                                </div>
+                            ) : filteredLogs.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-10 text-slate-400">
                                     <ClipboardCheck size={48} className="mb-4 opacity-20" />
                                     <p>No verification history found.</p>
                                 </div>
+                            ) : (
+                                filteredLogs.map(log => (
+                                    <div key={log.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                                        <div>
+                                            <p className="font-bold text-slate-800 dark:text-white">{log.assetName}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{log.assetId}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{new Date(log.timestamp || log.verifiedAt || log.date).toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-full text-emerald-600 dark:text-emerald-400">
+                                            <Check size={18} />
+                                        </div>
+                                    </div>
+                                ))
                             )}
-                            {filteredLogs.map(log => (
-                                <div key={log.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                                    <div>
-                                        <p className="font-bold text-slate-800 dark:text-white">{log.assetName}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{new Date(log.timestamp).toLocaleString()}</p>
-                                    </div>
-                                    <div className="bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-full text-emerald-600 dark:text-emerald-400">
-                                        <Check size={18} />
-                                    </div>
-                                </div>
-                            ))}
                         </>
                     ) : (
                         <>
-                            {filteredComplaints.length === 0 && (
+                            {isLoadingComplaints ? (
+                                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                                    <RefreshCw size={48} className="mb-4 opacity-20 animate-spin" />
+                                    <p>Loading complaints...</p>
+                                </div>
+                            ) : filteredComplaints.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-10 text-slate-400">
                                     <AlertTriangle size={48} className="mb-4 opacity-20" />
                                     <p>No complaints raised found.</p>
                                 </div>
-                            )}
-                            {filteredComplaints.map(complaint => (
-                                <div key={complaint.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                            <p className="font-bold text-slate-800 dark:text-white">{complaint.assetName}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(complaint.date).toLocaleString()}</p>
+                            ) : (
+                                filteredComplaints.map(complaint => (
+                                    <div key={complaint.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-white">{complaint.assetName}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(complaint.date || complaint.createdAt || complaint.timestamp).toLocaleString()}</p>
+                                            </div>
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${complaint.status === 'Pending' || complaint.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                {complaint.status}
+                                            </span>
                                         </div>
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${complaint.status === 'Pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                            {complaint.status}
-                                        </span>
+                                        <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                                            {complaint.description}
+                                        </p>
+                                        {complaint.imageUrl && (
+                                            <div className="mt-3">
+                                                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Evidence:</p>
+                                                <img 
+                                                    src={complaint.imageUrl} 
+                                                    alt="Complaint Evidence" 
+                                                    className="rounded-lg object-cover border border-slate-200 dark:border-slate-700 shadow-sm w-full max-w-[200px] h-32 hover:scale-105 transition-transform cursor-pointer"
+                                                    onClick={() => setSelectedImage(complaint.imageUrl!)}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
-                                        {complaint.description}
-                                    </p>
-                                    {complaint.imageUrl && (
-                                        <div className="mt-3">
-                                            <p className="text-xs font-semibold text-slate-500 mb-1">Evidence:</p>
-                                            <img src={complaint.imageUrl} alt="Evidence" className="h-24 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </>
                     )}
                 </div>
+                
+                {/* Image Modal */}
+                {selectedImage && (
+                    <div 
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setSelectedImage(null)}
+                    >
+                        <div className="relative max-w-4xl max-h-[90vh] w-full">
+                            <button
+                                onClick={() => setSelectedImage(null)}
+                                className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                            <img 
+                                src={selectedImage} 
+                                alt="Complaint Evidence" 
+                                className="w-full h-full object-contain rounded-lg"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -698,7 +934,7 @@ export const StaffModule = () => {
                                 placeholder="Enter ID (e.g. AST-001)"
                                 required
                                 onBlur={(e) => {
-                                    const found = assets.find(a => a.id === e.target.value);
+                                    const found = staffAssets.find(a => a.id === e.target.value);
                                     if (found) setSelectedAsset(found);
                                 }}
                             />
@@ -733,25 +969,68 @@ export const StaffModule = () => {
                         ></textarea>
                     </div>
 
-                    <label className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-slate-400 font-medium flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 transition-colors cursor-pointer">
-                        {complaintImage ? (
-                            <img src={complaintImage} className="max-h-32 object-contain" />
-                        ) : (
-                            <>
-                                <Camera size={24} />
-                                <span>Attach Photo Evidence</span>
-                            </>
-                        )}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleComplaintImageUpload} />
-                    </label>
+                    {complaintImage ? (
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Photo Evidence</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setComplaintImage('')}
+                                    className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors"
+                                >
+                                    <X size={14} />
+                                    Remove
+                                </button>
+                            </div>
+                            <img src={complaintImage} className="w-full max-h-48 object-contain rounded-lg border border-slate-200 dark:border-slate-700" />
+                        </div>
+                    ) : (
+                        <label className="w-full py-4 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-slate-400 font-medium flex flex-col items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-400 transition-colors cursor-pointer">
+                            <Camera size={24} />
+                            <span>Attach Photo Evidence</span>
+                            <span className="text-xs text-slate-400">Max size: 2MB</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={handleComplaintImageUpload} />
+                        </label>
+                    )}
 
-                    <button type="submit" className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-slate-200 dark:shadow-indigo-900/30 mt-auto">Submit Report</button>
+                    <button 
+                        type="submit" 
+                        disabled={isSubmittingComplaint}
+                        className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-slate-200 dark:shadow-indigo-900/30 mt-auto disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    >
+                        {isSubmittingComplaint ? 'Submitting...' : 'Submit Report'}
+                    </button>
                 </form>
             </div>
         );
     }
 
-    return null;
+    return (
+        <>
+            {/* Image Modal */}
+            {selectedImage && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div className="relative max-w-4xl max-h-[90vh] w-full">
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        >
+                            <X size={24} />
+                        </button>
+                        <img 
+                            src={selectedImage} 
+                            alt="Complaint Evidence" 
+                            className="w-full h-full object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+        </>
+    );
 };
 
 const DashboardTile = ({ icon, title, subtitle, color, onClick, isPrimary, fullWidth }: any) => (
