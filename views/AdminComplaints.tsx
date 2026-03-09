@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle, Clock, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Search, ChevronLeft, ChevronRight, X, Download, ChevronDown, FileSpreadsheet, FileText, Calendar } from 'lucide-react';
 import { Complaint } from '../types';
-import { fetchComplaints } from '../services/dashboardService';
+import { fetchComplaints, exportComplaints } from '../services/dashboardService';
 
 export const AdminComplaints = () => {
     const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -10,6 +10,9 @@ export const AdminComplaints = () => {
     const [error, setError] = useState<string | null>(null);
     const [resolvingId, setResolvingId] = useState<string | null>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+    const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
@@ -21,7 +24,7 @@ export const AdminComplaints = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalRecords, setTotalRecords] = useState(0);
-    const [limit] = useState(10);
+    const [limit] = useState(5);
 
     const loadComplaints = async () => {
         setLoading(true);
@@ -99,6 +102,108 @@ export const AdminComplaints = () => {
         }
     };
 
+    const handleExport = async (format: 'excel' | 'pdf') => {
+        setIsExporting(true);
+        setIsExportDropdownOpen(false);
+        
+        try {
+            const params = {
+                search: searchTerm || undefined,
+                status: statusFilter !== 'All' ? statusFilter : undefined,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+            };
+            const exportData = await exportComplaints(params);
+            
+            // Handle different response structures
+            let data: Complaint[] = [];
+            if (exportData && typeof exportData === 'object') {
+                if (Array.isArray(exportData.data)) {
+                    data = exportData.data;
+                } else if (Array.isArray(exportData)) {
+                    data = exportData as Complaint[];
+                }
+            }
+
+            if (data.length === 0) {
+                alert('No data to export');
+                setIsExporting(false);
+                return;
+            }
+
+            if (format === 'excel') {
+                await exportToExcel(data);
+            } else {
+                await exportToPDF(data);
+            }
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Failed to export data. Please try again.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const exportToExcel = async (data: any[]) => {
+        const XLSX = await import('xlsx');
+        
+        const worksheetData = data.map((complaint) => ({
+            'Asset Name': complaint.assetName || 'N/A',
+            'Asset ID': complaint.assetId || 'N/A',
+            'Status': complaint.status || 'N/A',
+            'Description': complaint.description || 'N/A',
+            'Reported By': complaint.reportedBy || 'N/A',
+            'Date': complaint.date || complaint.timestamp ? new Date(complaint.date || complaint.timestamp).toLocaleString() : 'N/A',
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Complaints');
+        
+        const maxWidth = 30;
+        const colWidths = Object.keys(worksheetData[0] || {}).map(key => ({
+            wch: Math.min(Math.max(key.length, 10), maxWidth)
+        }));
+        worksheet['!cols'] = colWidths;
+
+        const fileName = `complaints-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+    };
+
+    const exportToPDF = async (data: any[]) => {
+        const { jsPDF } = await import('jspdf');
+        const autoTable = (await import('jspdf-autotable')).default;
+        
+        const doc = new jsPDF();
+        
+        doc.setFontSize(18);
+        doc.text('Complaints Report', 14, 20);
+        
+        doc.setFontSize(10);
+        doc.text(`Exported on: ${new Date().toLocaleString()}`, 14, 28);
+        
+        const tableData = data.map((complaint) => [
+            complaint.assetName || 'N/A',
+            complaint.assetId || 'N/A',
+            complaint.status || 'N/A',
+            complaint.description ? complaint.description.substring(0, 50) + '...' : 'N/A',
+            complaint.reportedBy || 'N/A',
+            complaint.date || complaint.timestamp ? new Date(complaint.date || complaint.timestamp).toLocaleDateString() : 'N/A',
+        ]);
+
+        autoTable(doc, {
+            head: [['Asset Name', 'Asset ID', 'Status', 'Description', 'Reported By', 'Date']],
+            body: tableData,
+            startY: 35,
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [79, 70, 229], textColor: 255 },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+        });
+
+        const fileName = `complaints-export-${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(fileName);
+    };
+
     const handlePageChange = (newPage: number) => {
         if (newPage >= 1 && newPage <= totalPages) {
             setCurrentPage(newPage);
@@ -116,102 +221,84 @@ export const AdminComplaints = () => {
     return (
         <div className="space-y-6">
             {/* Filter Section */}
-            <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors duration-200">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white">User Complaints</h1>
-                    <div className="bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-xl text-amber-600 dark:text-amber-400 font-bold flex items-center gap-2">
-                        <AlertTriangle size={20} />
-                        {totalRecords} Total
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm space-y-6 transition-colors duration-200">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="relative flex-1 w-full">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder="Search by ID, Name, Serial..."
+                            className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50/50 dark:focus:ring-indigo-900/50 transition-all outline-none text-slate-700 dark:text-slate-200 placeholder:text-slate-400 font-medium"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                        />
                     </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Search */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Search
-                        </label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Asset name, ID, description..."
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Status Filter */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Status
-                        </label>
+                    
+                    {/* Filter Group */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full md:w-auto min-w-[350px]">
+                        {/* Status Filter */}
                         <select
                             value={statusFilter}
                             onChange={(e) => {
                                 setStatusFilter(e.target.value as 'All' | 'Pending' | 'Resolved');
                                 setCurrentPage(1);
                             }}
-                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                            className="w-full flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-indigo-200 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all"
                         >
-                            <option value="All">All Statuses</option>
+                            <option value="All">Status: All</option>
                             <option value="Pending">Pending</option>
                             <option value="Resolved">Resolved</option>
                         </select>
-                    </div>
 
-                    {/* Start Date */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Start Date
-                        </label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => {
-                                setStartDate(e.target.value);
-                                setCurrentPage(1);
-                            }}
-                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-                        />
-                    </div>
-
-                    {/* End Date */}
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            End Date
-                        </label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => {
-                                setEndDate(e.target.value);
-                                setCurrentPage(1);
-                            }}
-                            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-                        />
+                        {/* Date Range Dropdown */}
+                        <div className="relative">
+                            <button 
+                                onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                                className={`w-full flex items-center justify-between bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-indigo-200 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900 transition-all ${
+                                    isDateDropdownOpen ? 'ring-2 ring-indigo-100 dark:ring-indigo-900 border-indigo-200 dark:border-indigo-800' : ''
+                                }`}
+                            >
+                                <span className="flex items-center gap-2 truncate">
+                                    <Calendar size={16} className="text-slate-400" />
+                                    {startDate || endDate ? `${startDate ? startDate : '...'} - ${endDate ? endDate : '...'}` : 'Date Range'}
+                                </span>
+                                <ChevronDown size={16} className={`text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {isDateDropdownOpen && (
+                                <div className="absolute top-full right-0 w-full md:w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 mt-2 p-4 z-20 animate-in fade-in zoom-in duration-200">
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">From</label>
+                                            <input 
+                                                type="date"
+                                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:text-slate-200"
+                                                value={startDate}
+                                                onChange={e => setStartDate(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">To</label>
+                                            <input 
+                                                type="date"
+                                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:text-slate-200"
+                                                value={endDate}
+                                                onChange={e => setEndDate(e.target.value)}
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={() => { setStartDate(''); setEndDate(''); setIsDateDropdownOpen(false); }}
+                                            className="w-full py-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                        >
+                                            Clear Dates
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {isDateDropdownOpen && <div className="fixed inset-0 z-10" onClick={() => setIsDateDropdownOpen(false)}></div>}
+                        </div>
                     </div>
                 </div>
-
-                {/* Active filters count */}
-                {(searchTerm || statusFilter !== 'All' || startDate || endDate) && (
-                    <div className="mt-4 flex items-center justify-between">
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                            Showing {complaints.length} of {totalRecords} complaints
-                        </p>
-                        <button
-                            onClick={handleClearFilters}
-                            className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
-                        >
-                            Clear Filters
-                        </button>
-                    </div>
-                )}
             </div>
 
             {loading ? (
@@ -301,13 +388,55 @@ export const AdminComplaints = () => {
                     )}
                 </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors duration-200">
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                                Showing page {currentPage} of {totalPages} ({totalRecords} total complaints)
-                            </div>
+                {/* Pagination and Export */}
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors duration-200">
+                    <div className="flex items-center justify-between">
+                        {/* Export Button - Bottom Left */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                                disabled={isExporting || complaints.length === 0}
+                                className={`flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all ${
+                                    isExporting || complaints.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                            >
+                                <Download size={18} />
+                                {isExporting ? 'Exporting...' : 'Export'}
+                                {!isExporting && complaints.length > 0 && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
+                            </button>
+
+                            {isExportDropdownOpen && !isExporting && complaints.length > 0 && (
+                                <div className="absolute left-0 bottom-full mb-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
+                                    <button
+                                        onClick={() => handleExport('excel')}
+                                        className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 transition-colors"
+                                    >
+                                        <FileSpreadsheet size={16} />
+                                        Export as Excel
+                                    </button>
+                                    <button
+                                        onClick={() => handleExport('pdf')}
+                                        className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
+                                    >
+                                        <FileText size={16} />
+                                        Export as PDF
+                                    </button>
+                                </div>
+                            )}
+                            {isExportDropdownOpen && !isExporting && complaints.length > 0 && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
+                        </div>
+
+                        {/* Pagination Info - Centered */}
+                        <div className="text-sm text-slate-600 dark:text-slate-400">
+                            {totalPages > 1 ? (
+                                <>Showing page {currentPage} of {totalPages} ({totalRecords} total complaints)</>
+                            ) : (
+                                <>{totalRecords} total complaint{totalRecords !== 1 ? 's' : ''}</>
+                            )}
+                        </div>
+
+                        {/* Pagination Buttons */}
+                        {totalPages > 1 ? (
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => handlePageChange(currentPage - 1)}
@@ -353,9 +482,11 @@ export const AdminComplaints = () => {
                                     <ChevronRight size={16} />
                                 </button>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="w-[200px]"></div>
+                        )}
                     </div>
-                )}
+                </div>
             </>
             )}
 

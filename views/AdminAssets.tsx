@@ -24,7 +24,7 @@ export const AdminAssets = () => {
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
 
   // Data
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -283,41 +283,6 @@ export const AdminAssets = () => {
                     {isDateDropdownOpen && <div className="fixed inset-0 z-10" onClick={() => setIsDateDropdownOpen(false)}></div>}
                 </div>
             </div>
-
-            {/* Export Button */}
-            <div className="relative">
-              <button
-                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                disabled={isExporting}
-                className={`flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-emerald-200 dark:shadow-none hover:bg-emerald-700 transition-all ${
-                  isExporting ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                <Download size={18} />
-                {isExporting ? 'Exporting...' : 'Export'}
-                {!isExporting && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
-              </button>
-
-              {isExportDropdownOpen && !isExporting && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
-                  <button
-                    onClick={() => handleExport('excel')}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-3 transition-colors"
-                  >
-                    <FileSpreadsheet size={16} />
-                    Export as Excel
-                  </button>
-                  <button
-                    onClick={() => handleExport('pdf')}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
-                  >
-                    <FileText size={16} />
-                    Export as PDF
-                  </button>
-                </div>
-              )}
-              {isExportDropdownOpen && !isExporting && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
-            </div>
           </div>
       </div>
 
@@ -413,7 +378,45 @@ export const AdminAssets = () => {
         
       {/* Pagination */}
       <div className="flex justify-between items-center pt-4">
+            {/* Export Button - Bottom Left */}
+            <div className="relative">
+              <button
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                disabled={isExporting}
+                className={`flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all ${
+                  isExporting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Download size={18} />
+                {isExporting ? 'Exporting...' : 'Export'}
+                {!isExporting && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
+              </button>
+
+              {isExportDropdownOpen && !isExporting && (
+                <div className="absolute left-0 bottom-full mb-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
+                  <button
+                    onClick={() => handleExport('excel')}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 transition-colors"
+                  >
+                    <FileSpreadsheet size={16} />
+                    Export as Excel
+                  </button>
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
+                  >
+                    <FileText size={16} />
+                    Export as PDF
+                  </button>
+                </div>
+              )}
+              {isExportDropdownOpen && !isExporting && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
+            </div>
+
+            {/* Page Info - Centered */}
             <span className="text-sm text-slate-400 dark:text-slate-500 font-medium">Page {currentPage} of {totalPages}</span>
+
+            {/* Navigation Buttons */}
             <div className="flex gap-2">
                 <button 
                     disabled={currentPage === 1}
