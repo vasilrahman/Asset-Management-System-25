@@ -209,6 +209,45 @@ export const fetchComplaints = async (params?: FetchComplaintsParams): Promise<C
   }
 };
 
+export interface ExportComplaintsParams {
+  search?: string;
+  status?: string;
+  reportedBy?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ExportComplaintsResponse {
+  data: Complaint[];
+  total: number;
+  exportedAt: string;
+}
+
+export const exportComplaints = async (params?: ExportComplaintsParams): Promise<ExportComplaintsResponse> => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    throw new Error('No access token found');
+  }
+
+  const queryParams = new URLSearchParams();
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.status && params.status !== 'All') queryParams.append('status', params.status.toUpperCase());
+  if (params?.reportedBy && params.reportedBy !== 'All') queryParams.append('reportedBy', params.reportedBy);
+  if (params?.startDate) queryParams.append('startDate', params.startDate);
+  if (params?.endDate) queryParams.append('endDate', params.endDate);
+
+  const queryString = queryParams.toString();
+  const url = queryString ? `${API_BASE_URL}/admin/complaints/export/data?${queryString}` : `${API_BASE_URL}/admin/complaints/export/data`;
+
+  const response = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
 export const fetchUsers = async (): Promise<User[]> => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
