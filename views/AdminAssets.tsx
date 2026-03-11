@@ -141,7 +141,7 @@ export const AdminAssets = () => {
     const XLSX = await import('xlsx');
     
     const worksheetData = data.map((asset) => ({
-      'QR Code': asset.qrCode || asset.qrCode === null ? asset.qrCode || 'Not Assigned' : 'Not Assigned',
+      'QR Code': asset.id || 'Not Assigned',
       'Asset Name': asset.name || 'N/A',
       'Category': asset.category || 'N/A',
       'Serial Number': asset.serialNumber || 'N/A',
@@ -183,7 +183,7 @@ export const AdminAssets = () => {
     
     // Table
     const tableData = data.map((asset) => [
-      asset.qrCode || 'Not Assigned',
+      asset.id || 'Not Assigned',
       asset.name || 'N/A',
       asset.category || 'N/A',
       asset.serialNumber || 'N/A',
@@ -329,7 +329,7 @@ export const AdminAssets = () => {
                   <div className="col-span-3 w-full text-center md:text-left">
                       <h4 className="font-semibold text-slate-800 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{asset.name}</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                        QR: {asset.qrCode || 'Not Assigned'}
+                        QR: {asset.id || 'Not Assigned'}
                       </p>
                   </div>
                   
