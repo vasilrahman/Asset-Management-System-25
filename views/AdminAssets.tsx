@@ -146,7 +146,6 @@ export const AdminAssets = () => {
       'Category': asset.category || 'N/A',
       'Serial Number': asset.serialNumber || 'N/A',
       'Status': asset.status || 'N/A',
-      'Location': asset.location || 'N/A',
       'Last Verified': asset.lastVerifiedAt ? new Date(asset.lastVerifiedAt).toLocaleDateString() : 'Never',
       'Created Date': asset.createdAt ? new Date(asset.createdAt).toLocaleDateString() : 'N/A',
     }));
@@ -188,12 +187,11 @@ export const AdminAssets = () => {
       asset.category || 'N/A',
       asset.serialNumber || 'N/A',
       asset.status || 'N/A',
-      asset.location || 'N/A',
       asset.lastVerifiedAt ? new Date(asset.lastVerifiedAt).toLocaleDateString() : 'Never',
     ]);
 
     autoTable(doc, {
-      head: [['QR Code', 'Name', 'Category', 'Serial', 'Status', 'Location', 'Last Verified']],
+      head: [['QR Code', 'Name', 'Category', 'Serial', 'Status', 'Last Verified']],
       body: tableData,
       startY: 35,
       styles: { fontSize: 8, cellPadding: 2 },
