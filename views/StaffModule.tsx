@@ -677,7 +677,7 @@ export const StaffModule = () => {
             <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col animate-in slide-in-from-bottom-10 duration-300">
                 <div className="relative h-72 bg-slate-800 flex items-center justify-center">
                     {selectedAsset.imageUrl ? (
-                        <img src={selectedAsset.imageUrl} className="w-full h-full object-cover opacity-80" alt="Asset" />
+                        <img src={selectedAsset.imageUrl} className="w-full h-full object-contain" alt="Asset" />
                     ) : (
                         <Package className="text-slate-500" size={64} />
                     )}
