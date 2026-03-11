@@ -70,7 +70,7 @@ export const AdminGenerateQR = () => {
             // Display QR Code ID
             doc.setFontSize(9);
             doc.setFont("helvetica", "bold");
-            doc.text(`QR Code: ${qrCode.code}`, x + cellWidth/2, y + 50, { align: 'center' });
+            doc.text(`${qrCode.code}`, x + cellWidth/2, y + 50, { align: 'center' });
 
             col++;
             if (col >= cols) {
