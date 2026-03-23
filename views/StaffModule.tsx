@@ -730,7 +730,7 @@ export const StaffModule = () => {
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
                     <button onClick={() => setView('HOME')} className="absolute top-6 left-6 bg-white/10 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/20 transition-colors border border-white/10"><ChevronLeft /></button>
                     <div className="absolute bottom-6 left-6 text-white max-w-[80%]">
-                        <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider mb-2 inline-block ${selectedAsset.status === 'Active' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>{selectedAsset.status}</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2 inline-block border ${selectedAsset.status?.toUpperCase() === 'ACTIVE' ? 'bg-emerald-100/30 text-emerald-300 border-emerald-300/50' : 'bg-amber-100/30 text-amber-300 border-amber-300/50'}`}>{selectedAsset.status}</span>
                         <h2 className="text-3xl font-bold leading-tight mb-1">{selectedAsset.name}</h2>
                         <p className="text-slate-300 font-mono text-sm">{selectedAsset.id}</p>
                     </div>
