@@ -17,7 +17,7 @@ export const AdminVerified = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedStatus, setSelectedStatus] = useState('All');
+  const [selectedVerifiedBy, setSelectedVerifiedBy] = useState('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -43,7 +43,7 @@ export const AdminVerified = () => {
       const params = {
         search: debouncedSearch || undefined,
         category: selectedCategory !== 'All' ? selectedCategory : undefined,
-        status: selectedStatus !== 'All' ? selectedStatus : undefined,
+        verifiedBy: selectedVerifiedBy !== 'All' ? selectedVerifiedBy : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         page: currentPage,
@@ -85,7 +85,7 @@ export const AdminVerified = () => {
       const params = {
         search: debouncedSearch || undefined,
         category: selectedCategory !== 'All' ? selectedCategory : undefined,
-        status: selectedStatus !== 'All' ? selectedStatus : undefined,
+        verifiedBy: selectedVerifiedBy !== 'All' ? selectedVerifiedBy : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       };
@@ -190,7 +190,7 @@ export const AdminVerified = () => {
 
   useEffect(() => {
     loadVerifications();
-  }, [debouncedSearch, selectedCategory, selectedStatus, startDate, endDate, currentPage]);
+  }, [debouncedSearch, selectedCategory, selectedVerifiedBy, startDate, endDate, currentPage]);
 
   const calculatedTotalPages = Math.max(currentPage, totalPages);
 
@@ -198,7 +198,7 @@ export const AdminVerified = () => {
     setSearchTerm('');
     setDebouncedSearch('');
     setSelectedCategory('All');
-    setSelectedStatus('All');
+    setSelectedVerifiedBy('All');
     setStartDate('');
     setEndDate('');
     setCurrentPage(1);
@@ -223,13 +223,20 @@ export const AdminVerified = () => {
     { value: 'Other', label: 'Other' },
   ];
 
-  const statusOptions = [
-    { value: 'All', label: 'Status: All' },
-    { value: 'Active', label: 'Active' },
-    { value: 'Maintenance', label: 'Maintenance' },
-    { value: 'Retired', label: 'Retired' },
-    { value: 'Lost', label: 'Lost' },
-  ];
+  // Get unique staff names from logs
+  const verifiedByOptions = (() => {
+    const uniqueNames = new Set<string>();
+    logs.forEach(log => {
+      if (log.verifiedBy) {
+        uniqueNames.add(log.verifiedBy);
+      }
+    });
+    const options = [{ value: 'All', label: 'Verified By: All' }];
+    Array.from(uniqueNames).sort().forEach(name => {
+      options.push({ value: name, label: name });
+    });
+    return options;
+  })();
 
   return (
     <div className="space-y-6">
@@ -255,9 +262,9 @@ export const AdminVerified = () => {
                     options={categoryOptions} 
                 />
                 <CustomSelect 
-                    value={selectedStatus} 
-                    onChange={setSelectedStatus} 
-                    options={statusOptions} 
+                    value={selectedVerifiedBy} 
+                    onChange={setSelectedVerifiedBy} 
+                    options={verifiedByOptions} 
                 />
 
                 {/* Date Range Dropdown */}
