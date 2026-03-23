@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Clock, Search, ChevronLeft, ChevronRight, X, Download, ChevronDown, FileSpreadsheet, FileText, Calendar } from 'lucide-react';
-import { Complaint } from '../types';
-import { fetchComplaints, exportComplaints } from '../services/dashboardService';
+import { Complaint, User } from '../types';
+import { fetchComplaints, exportComplaints, fetchUsers } from '../services/dashboardService';
+import { CustomSelect } from '../components/CustomSelect';
 
 export const AdminComplaints = () => {
     const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -18,6 +19,7 @@ export const AdminComplaints = () => {
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Resolved'>('All');
+    const [selectedReportedBy, setSelectedReportedBy] = useState('All');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
@@ -26,6 +28,26 @@ export const AdminComplaints = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [totalRecords, setTotalRecords] = useState(0);
     const [limit] = useState(5);
+    const [staffOptions, setStaffOptions] = useState<{ value: string; label: string }[]>([]);
+
+    // Fetch staff users on component mount
+    useEffect(() => {
+        const loadStaffUsers = async () => {
+            try {
+                const users = await fetchUsers();
+                const staffUsers = users.filter(user => user.role === 'STAFF');
+                const options = [{ value: 'All', label: 'Reported By: All' }];
+                staffUsers.forEach(user => {
+                    options.push({ value: user.fullName, label: user.fullName });
+                });
+                setStaffOptions(options);
+            } catch (err) {
+                console.error('Failed to fetch staff users:', err);
+                setStaffOptions([{ value: 'All', label: 'Reported By: All' }]);
+            }
+        };
+        loadStaffUsers();
+    }, []);
 
     const loadComplaints = async () => {
         setLoading(true);
@@ -34,6 +56,7 @@ export const AdminComplaints = () => {
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
+                reportedBy: selectedReportedBy !== 'All' ? selectedReportedBy : undefined,
                 startDate: startDate || undefined,
                 endDate: endDate || undefined,
                 page: currentPage,
@@ -68,7 +91,7 @@ export const AdminComplaints = () => {
 
     useEffect(() => {
         loadComplaints();
-    }, [searchTerm, statusFilter, startDate, endDate, currentPage]);
+    }, [searchTerm, statusFilter, selectedReportedBy, startDate, endDate, currentPage]);
 
     const calculatedTotalPages = Math.max(currentPage, totalPages);
 
@@ -113,6 +136,7 @@ export const AdminComplaints = () => {
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
+                reportedBy: selectedReportedBy !== 'All' ? selectedReportedBy : undefined,
                 startDate: startDate || undefined,
                 endDate: endDate || undefined,
             };
@@ -216,6 +240,7 @@ export const AdminComplaints = () => {
     const handleClearFilters = () => {
         setSearchTerm('');
         setStatusFilter('All');
+        setSelectedReportedBy('All');
         setStartDate('');
         setEndDate('');
         setCurrentPage(1);
@@ -238,7 +263,7 @@ export const AdminComplaints = () => {
                     </div>
                     
                     {/* Filter Group */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full md:w-auto min-w-[350px]">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full md:w-auto min-w-[550px]">
                         {/* Status Filter */}
                         <select
                             value={statusFilter}
@@ -252,6 +277,16 @@ export const AdminComplaints = () => {
                             <option value="Pending">Pending</option>
                             <option value="Resolved">Resolved</option>
                         </select>
+
+                        {/* Reported By Filter */}
+                        <CustomSelect 
+                            value={selectedReportedBy}
+                            onChange={(value) => {
+                                setSelectedReportedBy(value);
+                                setCurrentPage(1);
+                            }}
+                            options={staffOptions}
+                        />
 
                         {/* Date Range Dropdown */}
                         <div className="relative">

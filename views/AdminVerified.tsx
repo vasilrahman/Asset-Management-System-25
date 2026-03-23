@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, X, Calendar, Download, ChevronLeft, ChevronRight, ChevronDown, FileSpreadsheet, FileText, Search, RefreshCw } from 'lucide-react';
-import { VerificationLog } from '../types';
-import { fetchVerifications, exportVerifications } from '../services/dashboardService';
+import { VerificationLog, User } from '../types';
+import { fetchVerifications, exportVerifications, fetchUsers } from '../services/dashboardService';
 import { CustomSelect } from '../components/CustomSelect';
 
 export const AdminVerified = () => {
@@ -26,6 +26,26 @@ export const AdminVerified = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [limit] = useState(5);
+  const [staffOptions, setStaffOptions] = useState<{ value: string; label: string }[]>([]);
+
+  // Fetch staff users on component mount
+  useEffect(() => {
+    const loadStaffUsers = async () => {
+      try {
+        const users = await fetchUsers();
+        const staffUsers = users.filter(user => user.role === 'STAFF');
+        const options = [{ value: 'All', label: 'Verified By: All' }];
+        staffUsers.forEach(user => {
+          options.push({ value: user.fullName, label: user.fullName });
+        });
+        setStaffOptions(options);
+      } catch (err) {
+        console.error('Failed to fetch staff users:', err);
+        setStaffOptions([{ value: 'All', label: 'Verified By: All' }]);
+      }
+    };
+    loadStaffUsers();
+  }, []);
 
   // Debounce search
   useEffect(() => {
@@ -223,21 +243,6 @@ export const AdminVerified = () => {
     { value: 'Other', label: 'Other' },
   ];
 
-  // Get unique staff names from logs
-  const verifiedByOptions = (() => {
-    const uniqueNames = new Set<string>();
-    logs.forEach(log => {
-      if (log.verifiedBy) {
-        uniqueNames.add(log.verifiedBy);
-      }
-    });
-    const options = [{ value: 'All', label: 'Verified By: All' }];
-    Array.from(uniqueNames).sort().forEach(name => {
-      options.push({ value: name, label: name });
-    });
-    return options;
-  })();
-
   return (
     <div className="space-y-6">
        {/* Filter Controls */}
@@ -264,7 +269,7 @@ export const AdminVerified = () => {
                 <CustomSelect 
                     value={selectedVerifiedBy} 
                     onChange={setSelectedVerifiedBy} 
-                    options={verifiedByOptions} 
+                    options={staffOptions} 
                 />
 
                 {/* Date Range Dropdown */}
