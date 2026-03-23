@@ -213,7 +213,7 @@ export const AdminUsers = () => {
                                <MoreHorizontal size={20} />
                            </button>
                            
-                           {/* Dropdown Menu */}
+                           {/* Dropdown Menu - Remove option hidden for ADMIN users */}
                            {activeDropdown === user.id && (
                                <div className="absolute right-0 top-10 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-10 overflow-hidden animate-in fade-in zoom-in duration-200">
                                    <button 
@@ -222,12 +222,14 @@ export const AdminUsers = () => {
                                     >
                                        <Edit size={16} /> Edit User
                                    </button>
-                                   <button 
-                                        onClick={() => handleDeleteClick(user)}
-                                        className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-slate-50 dark:border-slate-700"
-                                    >
-                                       <Trash2 size={16} /> Remove User
-                                   </button>
+                                   {user.role !== 'ADMIN' && (
+                                       <button 
+                                            onClick={() => handleDeleteClick(user)}
+                                            className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-slate-50 dark:border-slate-700"
+                                        >
+                                           <Trash2 size={16} /> Remove User
+                                       </button>
+                                   )}
                                </div>
                            )}
                        </div>
@@ -249,22 +251,25 @@ export const AdminUsers = () => {
                            {user.role}
                        </span>
                        
-                       <div className="flex items-center gap-3">
-                            <label className={`relative inline-flex items-center ${togglingUserId === user.id ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                                <input 
-                                  type="checkbox" 
-                                  className="sr-only peer" 
-                                  checked={user.isActive} 
-                                  onChange={() => togglePermission(user)}
-                                  disabled={togglingUserId === user.id}
-                                />
-                                <div className={`w-9 h-5 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-100 dark:peer-focus:ring-indigo-900 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${
-                                  togglingUserId === user.id 
-                                    ? 'bg-slate-300 dark:bg-slate-500' 
-                                    : 'bg-slate-200 dark:bg-slate-600 peer-checked:bg-indigo-600'
-                                }`}></div>
-                            </label>
-                       </div>
+                       {/* Toggle only visible for non-ADMIN users */}
+                       {user.role !== 'ADMIN' && (
+                           <div className="flex items-center gap-3">
+                                <label className={`relative inline-flex items-center ${togglingUserId === user.id ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                                    <input 
+                                      type="checkbox" 
+                                      className="sr-only peer" 
+                                      checked={user.isActive} 
+                                      onChange={() => togglePermission(user)}
+                                      disabled={togglingUserId === user.id}
+                                    />
+                                    <div className={`w-9 h-5 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-100 dark:peer-focus:ring-indigo-900 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${
+                                      togglingUserId === user.id 
+                                        ? 'bg-slate-300 dark:bg-slate-500' 
+                                        : 'bg-slate-200 dark:bg-slate-600 peer-checked:bg-indigo-600'
+                                    }`}></div>
+                                </label>
+                           </div>
+                       )}
                    </div>
                </div>
              ))

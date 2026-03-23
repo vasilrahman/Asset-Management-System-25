@@ -242,7 +242,7 @@ const MainLayout = () => {
                                     </div>
                                 )}
                                 <div className="text-left hidden lg:block">
-                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 leading-none mb-0.5">{user?.name}</p>
+                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 leading-none mb-0.5">{user?.fullName || user?.username}</p>
                                     <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-none uppercase font-bold">{user?.role}</p>
                                 </div>
                                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
@@ -252,8 +252,8 @@ const MainLayout = () => {
                                 <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
                                     <div className="p-2">
                                         <div className="px-3 py-2 border-b border-slate-50 dark:border-slate-700/50 mb-1 lg:hidden">
-                                            <p className="font-semibold text-slate-800 dark:text-slate-200">{user?.name}</p>
-                                            <p className="text-xs text-slate-500">{user?.email}</p>
+                                            <p className="font-semibold text-slate-800 dark:text-slate-200">{user?.fullName || user?.username}</p>
+                                            <p className="text-xs text-slate-500">{user?.role}</p>
                                         </div>
 
                                         {/* Dark Mode Toggle Item */}
