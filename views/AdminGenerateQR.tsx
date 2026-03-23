@@ -31,56 +31,70 @@ export const AdminGenerateQR = () => {
         }
         
         // 2. Generate PDF with QR codes from backend
+        // A4 Page: 210mm x 297mm (595.27 x 841.89 points)
         const doc = new jsPDF();
-        doc.setFontSize(16);
-        doc.text("AMS – Unassigned QR Codes", 105, 15, { align: 'center' });
-        doc.setFontSize(10);
-        doc.text(`Generated on ${new Date().toLocaleString()}`, 105, 22, { align: 'center' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
 
-        // Grid Configuration: 3 QR codes per row
-        const cols = 3;
-        const startX = 20;
-        const startY = 35;
-        const cellWidth = 55;
-        const cellHeight = 65;
-        const marginX = 5;
-        const marginY = 5;
+        doc.setFontSize(16);
+        doc.text("AMS – Unassigned QR Codes", pageWidth / 2, 15, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, 22, { align: 'center' });
+
+        // Grid Configuration: 4x4 layout (16 QR codes per page)
+        const cols = 4;
+        const rows = 4;
+        const marginX = 15;
+        const marginY = 30;
+        const cellWidth = (pageWidth - 2 * marginX) / cols;
+        const cellHeight = (pageHeight - marginY - 35) / rows;
 
         let col = 0;
         let row = 0;
+        let pageCount = 1;
 
         for (const qrCode of qrCodes) {
-            const x = startX + col * (cellWidth + marginX);
-            const y = startY + row * (cellHeight + marginY);
+            // Check if need new page
+            if (row >= rows) {
+                doc.addPage();
+                row = 0;
+                col = 0;
+                pageCount++;
+                doc.setFontSize(10);
+                doc.text(`Page ${pageCount}`, pageWidth / 2, 15, { align: 'center' });
+            }
 
-            // Draw Border for sticker
-            doc.setDrawColor(200, 200, 200);
-            doc.rect(x, y, cellWidth, cellHeight);
+            const x = marginX + col * cellWidth;
+            const y = marginY + row * cellHeight;
+
+            // Draw Border box
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.5);
+            doc.rect(x + 3, y + 3, cellWidth - 6, cellHeight - 6);
 
             // Generate QR Data URL using backend QR code
-            // Force image-based generation (no canvas)
             const qrUrl = await QRCode.toDataURL(qrCode.code, {
                 width: 300,
                 margin: 1,
                 type: 'image/png',
                 errorCorrectionLevel: 'H'
             });
-            doc.addImage(qrUrl, 'PNG', x + 7.5, y + 5, 40, 40);
 
-            // Display QR Code ID
-            doc.setFontSize(9);
+            // Draw QR code centered in cell
+            const qrSize = cellHeight - 20;
+            const qrX = x + (cellWidth - qrSize) / 2;
+            const qrY = y + 5;
+            doc.addImage(qrUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+            // Display QR Code ID below QR
+            doc.setFontSize(8);
             doc.setFont("helvetica", "bold");
-            doc.text(`${qrCode.code}`, x + cellWidth/2, y + 50, { align: 'center' });
+            doc.text(`${qrCode.code}`, x + cellWidth / 2, y + cellHeight - 5, { align: 'center' });
 
             col++;
             if (col >= cols) {
                 col = 0;
                 row++;
-                // Check if new page needed
-                if (startY + (row + 1) * (cellHeight + marginY) > 270) {
-                    doc.addPage();
-                    row = 0;
-                }
             }
         }
 
