@@ -70,6 +70,8 @@ export const AdminComplaints = () => {
         loadComplaints();
     }, [searchTerm, statusFilter, startDate, endDate, currentPage]);
 
+    const calculatedTotalPages = Math.max(currentPage, totalPages);
+
     const resolveComplaint = async (complaintId: string) => {
         if (resolvingId) return; // Prevent multiple simultaneous resolves
 
@@ -371,13 +373,13 @@ export const AdminComplaints = () => {
 
                 {/* Pagination and Export */}
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors duration-200">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4">
                         {/* Export Button - Bottom Left */}
                         <div className="relative">
                             <button
                                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
                                 disabled={isExporting || complaints.length === 0}
-                                className={`flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all ${
+                                className={`flex items-center gap-2 bg-indigo-900 text-blue-100 px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-900/30 dark:shadow-none hover:bg-indigo-950 transition-all ${
                                     isExporting || complaints.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
                             >
@@ -407,65 +409,69 @@ export const AdminComplaints = () => {
                             {isExportDropdownOpen && !isExporting && complaints.length > 0 && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
                         </div>
 
-                        {/* Pagination Info - Centered */}
-                        <div className="text-sm text-slate-600 dark:text-slate-400">
-                            {totalPages > 1 ? (
-                                <>Showing page {currentPage} of {totalPages} ({totalRecords} total complaints)</>
-                            ) : (
-                                <>{totalRecords} total complaint{totalRecords !== 1 ? 's' : ''}</>
+                        {/* Spacer */}
+                        <div className="flex-1"></div>
+
+                        {/* Right Section - Pagination Info and Buttons */}
+                        <div className="flex items-center gap-4">
+                            {/* Pagination Info */}
+                            <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                {complaints.length > 0 ? (
+                                    <>Page {currentPage} of {Math.max(1, calculatedTotalPages)}</>
+                                ) : (
+                                    <>No data</>
+                                )}
+                            </div>
+
+                            {/* Pagination Buttons */}
+                            {calculatedTotalPages > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                    >
+                                        <ChevronLeft size={16} />
+                                        Previous
+                                    </button>
+                                    <div className="flex items-center gap-1">
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                            let pageNum;
+                                            if (totalPages <= 5) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage <= 3) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage >= totalPages - 2) {
+                                                pageNum = totalPages - 4 + i;
+                                            } else {
+                                                pageNum = currentPage - 2 + i;
+                                            }
+                                            return (
+                                                <button
+                                                    key={pageNum}
+                                                    onClick={() => handlePageChange(pageNum)}
+                                                    className={`px-3 py-2 rounded-xl transition-colors ${
+                                                        currentPage === pageNum
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                                    }`}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <button
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === calculatedTotalPages}
+                                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                    >
+                                        Next
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
                             )}
                         </div>
-
-                        {/* Pagination Buttons */}
-                        {totalPages > 1 ? (
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                                >
-                                    <ChevronLeft size={16} />
-                                    Previous
-                                </button>
-                                <div className="flex items-center gap-1">
-                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                        let pageNum;
-                                        if (totalPages <= 5) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage <= 3) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage >= totalPages - 2) {
-                                            pageNum = totalPages - 4 + i;
-                                        } else {
-                                            pageNum = currentPage - 2 + i;
-                                        }
-                                        return (
-                                            <button
-                                                key={pageNum}
-                                                onClick={() => handlePageChange(pageNum)}
-                                                className={`px-3 py-2 rounded-xl transition-colors ${
-                                                    currentPage === pageNum
-                                                        ? 'bg-indigo-600 text-white'
-                                                        : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                                }`}
-                                            >
-                                                {pageNum}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                                >
-                                    Next
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="w-[200px]"></div>
-                        )}
                     </div>
                 </div>
             </>

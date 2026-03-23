@@ -70,6 +70,7 @@ export const AdminAssets = () => {
   }, [debouncedSearch, filterCategory, filterStatus, dateStart, dateEnd, currentPage]);
 
   const currentAssets = assets;
+  const calculatedTotalPages = Math.max(currentPage, totalPages);
 
   const categoryOptions = [
     { value: 'All', label: 'Category: All' },
@@ -375,61 +376,69 @@ export const AdminAssets = () => {
       </div>
         
       {/* Pagination */}
-      <div className="flex justify-between items-center pt-4">
-            {/* Export Button - Bottom Left */}
-            <div className="relative">
-              <button
-                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                disabled={isExporting}
-                className={`flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all ${
-                  isExporting ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                <Download size={18} />
-                {isExporting ? 'Exporting...' : 'Export'}
-                {!isExporting && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
-              </button>
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors duration-200">
+            <div className="flex items-center justify-between gap-4">
+                  {/* Export Button - Bottom Left */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                      disabled={isExporting}
+                      className={`flex items-center gap-2 bg-indigo-900 text-blue-100 px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-900/30 dark:shadow-none hover:bg-indigo-950 transition-all ${
+                        isExporting ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <Download size={18} />
+                      {isExporting ? 'Exporting...' : 'Export'}
+                      {!isExporting && <ChevronDown size={16} className={`transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />}
+                    </button>
 
-              {isExportDropdownOpen && !isExporting && (
-                <div className="absolute left-0 bottom-full mb-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
-                  <button
-                    onClick={() => handleExport('excel')}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 transition-colors"
-                  >
-                    <FileSpreadsheet size={16} />
-                    Export as Excel
-                  </button>
-                  <button
-                    onClick={() => handleExport('pdf')}
-                    className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
-                  >
-                    <FileText size={16} />
-                    Export as PDF
-                  </button>
-                </div>
-              )}
-              {isExportDropdownOpen && !isExporting && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
-            </div>
+                    {isExportDropdownOpen && !isExporting && (
+                      <div className="absolute left-0 bottom-full mb-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <button
+                          onClick={() => handleExport('excel')}
+                          className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 transition-colors"
+                        >
+                          <FileSpreadsheet size={16} />
+                          Export as Excel
+                        </button>
+                        <button
+                          onClick={() => handleExport('pdf')}
+                          className="w-full text-left px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-3 border-t border-slate-50 dark:border-slate-700 transition-colors"
+                        >
+                          <FileText size={16} />
+                          Export as PDF
+                        </button>
+                      </div>
+                    )}
+                    {isExportDropdownOpen && !isExporting && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
+                  </div>
 
-            {/* Page Info - Centered */}
-            <span className="text-sm text-slate-400 dark:text-slate-500 font-medium">Page {currentPage} of {totalPages}</span>
+                  {/* Spacer */}
+                  <div className="flex-1"></div>
 
-            {/* Navigation Buttons */}
-            <div className="flex gap-2">
-                <button 
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(p => p - 1)}
-                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-white dark:disabled:hover:bg-slate-800 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors"
-                >
-                    Previous
-                </button>
-                <button 
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(p => p + 1)}
-                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-white dark:disabled:hover:bg-slate-800 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors"
-                >
-                    Next
-                </button>
+                  {/* Right Section - Pagination Info and Buttons */}
+                  <div className="flex items-center gap-4">
+                      {/* Page Info */}
+                      <span className="text-sm text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">Page {currentPage} of {Math.max(1, calculatedTotalPages)}</span>
+
+                      {/* Navigation Buttons */}
+                      <div className="flex gap-2">
+                          <button 
+                              disabled={currentPage === 1}
+                              onClick={() => setCurrentPage(p => p - 1)}
+                              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-white dark:disabled:hover:bg-slate-800 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors"
+                          >
+                              Previous
+                          </button>
+                          <button 
+                              disabled={currentPage === calculatedTotalPages}
+                              onClick={() => setCurrentPage(p => p + 1)}
+                              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:hover:bg-white dark:disabled:hover:bg-slate-800 text-sm font-medium text-slate-600 dark:text-slate-300 transition-colors"
+                          >
+                              Next
+                          </button>
+                      </div>
+                  </div>
             </div>
       </div>
     </div>
