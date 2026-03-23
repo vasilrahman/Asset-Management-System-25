@@ -13,6 +13,7 @@ export const AdminComplaints = () => {
     const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+    const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
@@ -311,82 +312,62 @@ export const AdminComplaints = () => {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 gap-4">
-                        {complaints.length === 0 ? (
+                    {complaints.length === 0 ? (
                         <div className="bg-white dark:bg-slate-800 p-12 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
                             <AlertTriangle className="mx-auto text-slate-300 dark:text-slate-600 mb-4" size={48} />
                             <h3 className="text-lg font-medium text-slate-800 dark:text-white">No Complaints Found</h3>
                             <p className="text-slate-400 dark:text-slate-500">
-                                {complaints.length === 0 ? 'Everything is running smoothly.' : 'Try adjusting your filters.'}
+                                Everything is running smoothly.
                             </p>
                         </div>
                     ) : (
-                        complaints.map(complaint => (
-                            <div key={complaint.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-start justify-between gap-6 transition-colors duration-200">
-                                <div className="flex-1 space-y-3">
-                                    <div className="flex items-center gap-3">
-                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
-                                            complaint.status === 'Pending' || complaint.status === 'PENDING'
-                                                ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                                                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
-                                            }`}>
-                                            {complaint.status}
-                                        </span>
-                                        <span className="text-sm text-slate-400 dark:text-slate-500">{new Date(complaint.date || complaint.timestamp || '').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) + ', ' + new Date(complaint.date || complaint.timestamp || '').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}</span>
-                                    </div>
-                                    <h3 className="text-2xl font-bold text-slate-800 dark:text-white">
-                                        {complaint.assetName} <span className="text-slate-400 dark:text-slate-500 font-normal text-base">({complaint.assetId})</span>
-                                    </h3>
-                                    <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-                                        {complaint.description}
-                                    </p>
-                                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 pt-2">
-                                        <span className="font-semibold text-slate-700 dark:text-slate-300">Reported by:</span>
-                                        <span>{complaint.reportedBy}</span>
-                                    </div>
-                                    {complaint.imageUrl && (
-                                        <div className="mt-3">
-                                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Evidence:</p>
-                                            <img 
-                                                src={complaint.imageUrl} 
-                                                alt="Complaint Evidence" 
-                                                className="rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm max-w-xs h-32 object-cover hover:scale-105 transition-transform cursor-pointer"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedImage(complaint.imageUrl!);
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col gap-3 min-w-[140px]">
-                                    {complaint.status === 'Pending' ? (
-                                        <button 
-                                            onClick={() => resolveComplaint(complaint.id)}
-                                            disabled={resolvingId === complaint.id}
-                                            className={`flex items-center justify-center gap-2 py-2.5 px-5 rounded-xl font-semibold shadow-sm transition-colors text-sm ${
-                                                resolvingId === complaint.id
-                                                    ? 'bg-indigo-400 cursor-not-allowed text-white'
-                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                                            }`}
-                                        >
-                                            <CheckCircle size={18} />
-                                            {resolvingId === complaint.id ? 'Resolving...' : 'Resolve'}
-                                        </button>
-                                    ) : (
-                                        <button disabled className="flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 px-5 rounded-xl font-semibold shadow-sm text-sm cursor-not-allowed opacity-75">
-                                            <CheckCircle size={18} /> Resolved
-                                        </button>
-                                    )}
-                                    <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 py-2.5 px-5 rounded-xl font-semibold transition-colors text-sm">
-                                        View Details
-                                    </button>
-                                </div>
+                        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden transition-colors duration-200">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ASSET NAME</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ASSET ID</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">STATUS</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">DATE</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                        {complaints.map(complaint => (
+                                            <tr key={complaint.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                                <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">
+                                                    {complaint.assetName}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                                                    {complaint.assetId}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider inline-block ${
+                                                        complaint.status === 'Pending' || complaint.status === 'PENDING'
+                                                            ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                                                            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+                                                        }`}>
+                                                        {complaint.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                                    {new Date(complaint.date || complaint.timestamp || '').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <button 
+                                                        onClick={() => setSelectedComplaint(complaint)}
+                                                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors">
+                                                        View Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        ))
+                        </div>
                     )}
-                </div>
 
                 {/* Pagination and Export */}
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors duration-200">
@@ -509,6 +490,146 @@ export const AdminComplaints = () => {
                             className="w-full h-full object-contain rounded-lg"
                             onClick={(e) => e.stopPropagation()}
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Complaint Detail Modal */}
+            {selectedComplaint && (
+                <div 
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setSelectedComplaint(null)}
+                >
+                    <div 
+                        className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-colors duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 p-6 flex items-start justify-between">
+                            <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                        selectedComplaint.status === 'Pending' || selectedComplaint.status === 'PENDING'
+                                            ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                                            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+                                        }`}>
+                                        {selectedComplaint.status}
+                                    </span>
+                                    <span className="text-sm text-slate-400 dark:text-slate-500">
+                                        {new Date(selectedComplaint.date || selectedComplaint.timestamp || '').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} 
+                                        {', '}
+                                        {new Date(selectedComplaint.date || selectedComplaint.timestamp || '').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}
+                                    </span>
+                                </div>
+                                <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
+                                    {selectedComplaint.assetName} <span className="text-slate-400 dark:text-slate-500 font-normal text-base">({selectedComplaint.assetId})</span>
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => setSelectedComplaint(null)}
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 space-y-6">
+                            {/* Issue Section */}
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Issue</h3>
+                                <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    {selectedComplaint.description}
+                                </p>
+                            </div>
+
+                            {/* Reported By Section */}
+                            <div className="bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Reported By</h3>
+                                <p className="text-base text-slate-700 dark:text-slate-300 font-semibold">
+                                    {selectedComplaint.reportedBy}
+                                </p>
+                            </div>
+
+                            {/* Asset Information Section */}
+                            <div className="bg-slate-50 dark:bg-slate-900/30 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Asset Information</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">Asset Name</p>
+                                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedComplaint.assetName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">Asset ID</p>
+                                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedComplaint.assetId}</p>
+                                    </div>
+                                    {selectedComplaint.assetSerialNumber && (
+                                        <div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">Serial Number</p>
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedComplaint.assetSerialNumber}</p>
+                                        </div>
+                                    )}
+                                    {selectedComplaint.assetCategory && (
+                                        <div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">Category</p>
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedComplaint.assetCategory}</p>
+                                        </div>
+                                    )}
+                                    {selectedComplaint.assetLocation && (
+                                        <div className="col-span-2">
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 uppercase mb-1">Location</p>
+                                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{selectedComplaint.assetLocation}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Evidence Section */}
+                            {selectedComplaint.imageUrl && (
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Evidence</h3>
+                                    <img 
+                                        src={selectedComplaint.imageUrl} 
+                                        alt="Complaint Evidence" 
+                                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 shadow-md object-cover max-h-64 cursor-pointer hover:opacity-90 transition-opacity"
+                                        onClick={() => {
+                                            setSelectedImage(selectedComplaint.imageUrl!);
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Actions Section */}
+                            <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                {selectedComplaint.status === 'Pending' ? (
+                                    <button 
+                                        onClick={() => {
+                                            resolveComplaint(selectedComplaint.id);
+                                            setSelectedComplaint(null);
+                                        }}
+                                        disabled={resolvingId === selectedComplaint.id}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-semibold transition-colors text-sm ${
+                                            resolvingId === selectedComplaint.id
+                                                ? 'bg-indigo-400 cursor-not-allowed text-white'
+                                                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                        }`}
+                                    >
+                                        <CheckCircle size={18} />
+                                        {resolvingId === selectedComplaint.id ? 'Resolving...' : 'Resolve Complaint'}
+                                    </button>
+                                ) : (
+                                    <button disabled className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 px-5 rounded-xl font-semibold text-sm cursor-not-allowed opacity-75">
+                                        <CheckCircle size={18} /> Resolved
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => setSelectedComplaint(null)}
+                                    className="flex-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 py-3 px-5 rounded-xl font-semibold transition-colors text-sm"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
