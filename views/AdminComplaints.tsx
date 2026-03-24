@@ -30,6 +30,7 @@ export const AdminComplaints = () => {
     const [totalRecords, setTotalRecords] = useState(0);
     const [limit] = useState(5);
     const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
+    const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
     // Extract unique categories from complaints when they load
     useEffect(() => {
@@ -47,12 +48,23 @@ export const AdminComplaints = () => {
         setLoading(true);
         setError(null);
         try {
+            // Convert date strings to ISO format
+            let startDateISO: string | undefined;
+            let endDateISO: string | undefined;
+            
+            if (startDate) {
+                startDateISO = new Date(startDate).toISOString().split('T')[0] + 'T00:00:00Z';
+            }
+            if (endDate) {
+                endDateISO = new Date(endDate).toISOString().split('T')[0] + 'T23:59:59Z';
+            }
+            
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
                 category: selectedCategory !== 'All' ? selectedCategory : undefined,
-                startDate: startDate || undefined,
-                endDate: endDate || undefined,
+                startDate: startDateISO,
+                endDate: endDateISO,
                 page: currentPage,
                 limit: limit,
             };
@@ -83,9 +95,39 @@ export const AdminComplaints = () => {
         }
     };
 
+    // Debounced search effect
     useEffect(() => {
+        // Clear existing timer
+        if (searchDebounceTimer) {
+            clearTimeout(searchDebounceTimer);
+        }
+
+        // Set new timer for search
+        const timer = setTimeout(() => {
+            setCurrentPage(1);
+            loadComplaints();
+        }, 500); // 500ms debounce
+
+        setSearchDebounceTimer(timer);
+
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [searchTerm]);
+
+    // Effect for other filters (no debounce needed)
+    useEffect(() => {
+        setCurrentPage(1);
         loadComplaints();
-    }, [searchTerm, statusFilter, selectedCategory, startDate, endDate, currentPage]);
+    }, [statusFilter, selectedCategory, startDate, endDate]);
+
+    // Effect for pagination changes
+    useEffect(() => {
+        // Only load when currentPage changes (not on first mount from above effects)
+        if (currentPage > 1 || (currentPage === 1 && complaints.length > 0)) {
+            loadComplaints();
+        }
+    }, [currentPage]);
 
     const calculatedTotalPages = Math.max(currentPage, totalPages);
 
@@ -99,12 +141,23 @@ export const AdminComplaints = () => {
         setIsExportDropdownOpen(false);
         
         try {
+            // Convert date strings to ISO format
+            let startDateISO: string | undefined;
+            let endDateISO: string | undefined;
+            
+            if (startDate) {
+                startDateISO = new Date(startDate).toISOString().split('T')[0] + 'T00:00:00Z';
+            }
+            if (endDate) {
+                endDateISO = new Date(endDate).toISOString().split('T')[0] + 'T23:59:59Z';
+            }
+            
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
                 category: selectedCategory !== 'All' ? selectedCategory : undefined,
-                startDate: startDate || undefined,
-                endDate: endDate || undefined,
+                startDate: startDateISO,
+                endDate: endDateISO,
             };
             const exportData = await exportComplaints(params);
             
