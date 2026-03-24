@@ -20,7 +20,7 @@ export const AdminComplaints = () => {
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Resolved'>('All');
-    const [selectedReportedBy, setSelectedReportedBy] = useState('All');
+    const [selectedCategory, setSelectedCategory] = useState('All');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
@@ -29,26 +29,19 @@ export const AdminComplaints = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [totalRecords, setTotalRecords] = useState(0);
     const [limit] = useState(5);
-    const [staffOptions, setStaffOptions] = useState<{ value: string; label: string }[]>([]);
+    const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
 
-    // Fetch staff users on component mount
+    // Extract unique categories from complaints when they load
     useEffect(() => {
-        const loadStaffUsers = async () => {
-            try {
-                const users = await fetchUsers();
-                const staffUsers = users.filter(user => user.role === 'STAFF');
-                const options = [{ value: 'All', label: 'Reported By: All' }];
-                staffUsers.forEach(user => {
-                    options.push({ value: user.fullName, label: user.fullName });
-                });
-                setStaffOptions(options);
-            } catch (err) {
-                console.error('Failed to fetch staff users:', err);
-                setStaffOptions([{ value: 'All', label: 'Reported By: All' }]);
-            }
-        };
-        loadStaffUsers();
-    }, []);
+        if (complaints.length > 0) {
+            const uniqueCategories = [...new Set(complaints.map(c => c.assetCategory).filter(Boolean))].sort() as string[];
+            const options = [{ value: 'All', label: 'Category: All' }];
+            uniqueCategories.forEach(category => {
+                options.push({ value: category, label: category });
+            });
+            setCategoryOptions(options);
+        }
+    }, [complaints]);
 
     const loadComplaints = async () => {
         setLoading(true);
@@ -57,7 +50,7 @@ export const AdminComplaints = () => {
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
-                reportedBy: selectedReportedBy !== 'All' ? selectedReportedBy : undefined,
+                category: selectedCategory !== 'All' ? selectedCategory : undefined,
                 startDate: startDate || undefined,
                 endDate: endDate || undefined,
                 page: currentPage,
@@ -92,7 +85,7 @@ export const AdminComplaints = () => {
 
     useEffect(() => {
         loadComplaints();
-    }, [searchTerm, statusFilter, selectedReportedBy, startDate, endDate, currentPage]);
+    }, [searchTerm, statusFilter, selectedCategory, startDate, endDate, currentPage]);
 
     const calculatedTotalPages = Math.max(currentPage, totalPages);
 
@@ -109,7 +102,7 @@ export const AdminComplaints = () => {
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
-                reportedBy: selectedReportedBy !== 'All' ? selectedReportedBy : undefined,
+                category: selectedCategory !== 'All' ? selectedCategory : undefined,
                 startDate: startDate || undefined,
                 endDate: endDate || undefined,
             };
@@ -149,7 +142,7 @@ export const AdminComplaints = () => {
         
         const worksheetData = data.map((complaint) => ({
             'Asset Name': complaint.assetName || 'N/A',
-            'Asset ID': complaint.assetId || 'N/A',
+            'Category': complaint.assetCategory || 'N/A',
             'Status': complaint.status || 'N/A',
             'Description': complaint.description || 'N/A',
             'Reported By': complaint.reportedBy || 'N/A',
@@ -184,7 +177,7 @@ export const AdminComplaints = () => {
         
         const tableData = data.map((complaint) => [
             complaint.assetName || 'N/A',
-            complaint.assetId || 'N/A',
+            complaint.assetCategory || 'N/A',
             complaint.status || 'N/A',
             complaint.description ? complaint.description.substring(0, 50) + '...' : 'N/A',
             complaint.reportedBy || 'N/A',
@@ -192,7 +185,7 @@ export const AdminComplaints = () => {
         ]);
 
         autoTable(doc, {
-            head: [['Asset Name', 'Asset ID', 'Status', 'Description', 'Reported By', 'Date']],
+            head: [['Asset Name', 'Category', 'Status', 'Description', 'Reported By', 'Date']],
             body: tableData,
             startY: 35,
             styles: { fontSize: 8, cellPadding: 2 },
@@ -213,7 +206,7 @@ export const AdminComplaints = () => {
     const handleClearFilters = () => {
         setSearchTerm('');
         setStatusFilter('All');
-        setSelectedReportedBy('All');
+        setSelectedCategory('All');
         setStartDate('');
         setEndDate('');
         setCurrentPage(1);
@@ -251,14 +244,14 @@ export const AdminComplaints = () => {
                             <option value="Resolved">Resolved</option>
                         </select>
 
-                        {/* Reported By Filter */}
+                        {/* Category Filter */}
                         <CustomSelect 
-                            value={selectedReportedBy}
+                            value={selectedCategory}
                             onChange={(value) => {
-                                setSelectedReportedBy(value);
+                                setSelectedCategory(value);
                                 setCurrentPage(1);
                             }}
-                            options={staffOptions}
+                            options={categoryOptions}
                         />
 
                         {/* Date Range Dropdown */}
@@ -337,7 +330,7 @@ export const AdminComplaints = () => {
                                     <thead>
                                         <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                                             <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ASSET NAME</th>
-                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ASSET ID</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">CATEGORY</th>
                                             <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">STATUS</th>
                                             <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">DATE</th>
                                             <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ACTIONS</th>
@@ -350,7 +343,7 @@ export const AdminComplaints = () => {
                                                     {complaint.assetName}
                                                 </td>
                                                 <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                                                    {complaint.assetId}
+                                                    {complaint.assetCategory}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider inline-block ${
