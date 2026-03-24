@@ -11,6 +11,8 @@ export const AdminUserForm = () => {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { navigate, currentRoute } = useApp();
   
   // User State - removed random avatarUrl default
@@ -79,6 +81,47 @@ export const AdminUserForm = () => {
     }
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setErrors({ ...errors, avatar: 'Please select a valid image file' });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors({ ...errors, avatar: 'Image size should be less than 5MB' });
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64String = event.target?.result as string;
+        setUserData({ ...userData, avatarUrl: base64String });
+        setErrors({ ...errors, avatar: '' });
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to read file:', err);
+      setErrors({ ...errors, avatar: 'Failed to process image' });
+    } finally {
+      setIsUploadingAvatar(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -132,6 +175,11 @@ export const AdminUserForm = () => {
       // Only include password if it's provided
       if (userData.password) {
         requestBody.password = userData.password;
+      }
+
+      // Include avatar URL if it exists
+      if (userData.avatarUrl) {
+        requestBody.avatarUrl = userData.avatarUrl;
       }
 
       const url = editUserId 
@@ -220,15 +268,34 @@ export const AdminUserForm = () => {
        <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 p-8 space-y-8 overflow-visible">
            <div className="space-y-6">
                 <div className="flex flex-col items-center mb-8">
-                    <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-700 mb-4 overflow-hidden border-4 border-white dark:border-slate-600 shadow-lg flex items-center justify-center">
+                    <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-700 mb-4 overflow-hidden border-4 border-white dark:border-slate-600 shadow-lg flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity" onClick={handleAvatarClick}>
                         {userData.avatarUrl ? (
                             <img src={userData.avatarUrl} className="w-full h-full object-cover" alt="Preview" />
                         ) : (
                             <UserIcon className="text-slate-300 dark:text-slate-500" size={48} />
                         )}
                     </div>
-                    {/* Placeholder for future upload functionality */}
-                    <button type="button" className="text-sm text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Change Avatar</button>
+                    <button 
+                        type="button" 
+                        onClick={handleAvatarClick}
+                        disabled={isUploadingAvatar}
+                        className={`text-sm font-medium hover:underline transition-colors ${
+                          isUploadingAvatar 
+                            ? 'text-slate-400 cursor-not-allowed' 
+                            : 'text-indigo-600 dark:text-indigo-400'
+                        }`}
+                    >
+                        {isUploadingAvatar ? 'Uploading...' : 'Change Avatar'}
+                    </button>
+                    <input 
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="hidden"
+                        disabled={isUploadingAvatar}
+                    />
+                    {errors.avatar && <p className="text-red-500 text-xs mt-2">{errors.avatar}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

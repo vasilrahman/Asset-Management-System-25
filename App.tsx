@@ -14,6 +14,7 @@ import { StaffModule } from './views/StaffModule';
 import { AdminGenerateQR } from './views/AdminGenerateQR';
 import { AdminVerified } from './views/AdminVerified';
 import { AdminComplaints } from './views/AdminComplaints';
+import { AdminComplaintDetail } from './views/AdminComplaintDetail';
 
 import { LayoutDashboard, Package, Users, LogOut, Menu, X, Bell, AlertTriangle, User, Moon, Sun, ChevronDown, QrCode, CheckCircle, MessageSquare } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -69,7 +70,7 @@ const MainLayout = () => {
                 <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-700 p-4 flex justify-between items-center sticky top-0 z-30 transition-colors duration-200">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm shadow-indigo-200 dark:shadow-none">A</div>
-                        <span className="font-semibold text-slate-800 dark:text-white tracking-tight">AMS Staff</span>
+                        <span className="font-semibold text-slate-800 dark:text-white tracking-tight">{user?.fullName || 'AMS Staff'}</span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -128,6 +129,7 @@ const MainLayout = () => {
             case '/generate-qr': return <AdminGenerateQR />;
             case '/verified': return <AdminVerified />;
             case '/complaints': return <AdminComplaints />;
+            case '/complaint': return <AdminComplaintDetail />;
             default: return <AdminDashboard />;
         }
     };
@@ -159,7 +161,7 @@ const MainLayout = () => {
                         <span className="font-bold text-xl text-white">A</span>
                     </div>
                     <div>
-                        <h1 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">AMS Admin</h1>
+                        <h1 className="font-bold text-lg text-slate-800 dark:text-white tracking-tight">{user?.fullName || 'AMS Admin'}</h1>
                         <div className="flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                             <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">System Online</p>
@@ -242,8 +244,7 @@ const MainLayout = () => {
                                     </div>
                                 )}
                                 <div className="text-left hidden lg:block">
-                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 leading-none mb-0.5">{user?.name}</p>
-                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-none uppercase font-bold">{user?.role}</p>
+                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 leading-none mb-0.5">{user?.fullName || user?.username}</p>
                                 </div>
                                 <ChevronDown size={14} className={`text-slate-400 transition-transform ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -252,8 +253,7 @@ const MainLayout = () => {
                                 <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 duration-100 z-50">
                                     <div className="p-2">
                                         <div className="px-3 py-2 border-b border-slate-50 dark:border-slate-700/50 mb-1 lg:hidden">
-                                            <p className="font-semibold text-slate-800 dark:text-slate-200">{user?.name}</p>
-                                            <p className="text-xs text-slate-500">{user?.email}</p>
+                                            <p className="font-semibold text-slate-800 dark:text-slate-200">{user?.fullName || user?.username}</p>
                                         </div>
 
                                         {/* Dark Mode Toggle Item */}

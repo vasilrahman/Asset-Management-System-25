@@ -146,7 +146,7 @@ export const AdminAssetDetail = () => {
             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-lg font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
           >
             <Edit size={18} />
-            Edit Asset Details
+            Edit Asset
           </button>
           
           <button 
@@ -154,7 +154,7 @@ export const AdminAssetDetail = () => {
             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-red-300 dark:border-red-900/50 text-red-600 dark:text-red-400 rounded-lg font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
           >
             <Trash2 size={18} />
-            Remove Details
+            Remove Asset
           </button>
         </div>
       </div>

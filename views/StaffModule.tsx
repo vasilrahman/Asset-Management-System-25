@@ -25,10 +25,45 @@ export const StaffModule = () => {
     const [scannedQRData, setScannedQRData] = useState<{ qrId: string; qrCode: string; alreadyAssigned?: boolean } | null>(null);
     const [complaintText, setComplaintText] = useState('');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-    // History View State
+    const [verificationCooldown, setVerificationCooldown] = useState<{ [key: string]: number }>({});
+    const [nextVerifyTime, setNextVerifyTime] = useState<string>('');
     const [historyTab, setHistoryTab] = useState<'VERIFIED' | 'COMPLAINTS'>('VERIFIED');
-    const [historySearch, setHistorySearch] = useState('');
+    const [historySearch, setHistorySearch] = useState<string>('');
+
+    // Load verification cooldowns on mount
+    useEffect(() => {
+        const stored = localStorage.getItem('assetVerificationCooldowns');
+        if (stored) {
+            setVerificationCooldown(JSON.parse(stored));
+        }
+    }, []);
+
+    // Update next verify time when selected asset changes
+    useEffect(() => {
+        if (selectedAsset) {
+            const lastVerifyTime = verificationCooldown[selectedAsset.id];
+            if (lastVerifyTime) {
+                const nextTime = new Date(lastVerifyTime + 24 * 60 * 60 * 1000);
+                const now = new Date();
+                if (nextTime > now) {
+                    setNextVerifyTime(nextTime.toLocaleString());
+                } else {
+                    setNextVerifyTime('');
+                }
+            } else {
+                setNextVerifyTime('');
+            }
+        }
+    }, [selectedAsset, verificationCooldown]);
+
+    // Check if asset is in cooldown
+    const isAssetInCooldown = (assetId: string): boolean => {
+        const lastVerifyTime = verificationCooldown[assetId];
+        if (!lastVerifyTime) return false;
+        const now = Date.now();
+        const cooldownEnd = lastVerifyTime + 24 * 60 * 60 * 1000; // 24 hours
+        return now < cooldownEnd;
+    };
 
     // Registration Form State
     const [regData, setRegData] = useState({
@@ -167,10 +202,21 @@ export const StaffModule = () => {
                 console.log('Calling verifyStaffAsset with:', selectedAsset.id);
                 await verifyStaffAsset(selectedAsset.id);
                 console.log('verifyStaffAsset successful');
+                
+                // Store verification time in cooldown state and localStorage
+                const now = Date.now();
+                const updatedCooldown = { ...verificationCooldown, [selectedAsset.id]: now };
+                setVerificationCooldown(updatedCooldown);
+                localStorage.setItem('assetVerificationCooldowns', JSON.stringify(updatedCooldown));
+                
+                // Update next verify time
+                const nextTime = new Date(now + 24 * 60 * 60 * 1000);
+                setNextVerifyTime(nextTime.toLocaleString());
+                
                 if (currentUser) {
                     verifyAsset(selectedAsset.id, currentUser.name);
                 }
-                toast.success('Asset verified successfully');
+                toast.success('Asset verified successfully! Button will be available after 24 hours.');
                 setView('HOME');
             } catch (error: any) {
                 console.error('Failed to verify asset:', error);
@@ -684,7 +730,7 @@ export const StaffModule = () => {
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
                     <button onClick={() => setView('HOME')} className="absolute top-6 left-6 bg-white/10 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/20 transition-colors border border-white/10"><ChevronLeft /></button>
                     <div className="absolute bottom-6 left-6 text-white max-w-[80%]">
-                        <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase tracking-wider mb-2 inline-block ${selectedAsset.status === 'Active' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>{selectedAsset.status}</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2 inline-block border ${selectedAsset.status?.toUpperCase() === 'ACTIVE' ? 'bg-emerald-100/30 text-emerald-300 border-emerald-300/50' : 'bg-amber-100/30 text-amber-300 border-amber-300/50'}`}>{selectedAsset.status}</span>
                         <h2 className="text-3xl font-bold leading-tight mb-1">{selectedAsset.name}</h2>
                         <p className="text-slate-300 font-mono text-sm">{selectedAsset.id}</p>
                     </div>
@@ -701,9 +747,18 @@ export const StaffModule = () => {
                     </div>
 
                     <div className="mt-auto space-y-3">
-                        <button onClick={handleVerify} className="w-full bg-indigo-600 active:bg-indigo-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 flex items-center justify-center gap-2 transform active:scale-95 transition-all">
-                            <Check size={24} /> Mark as Verified
-                        </button>
+                        {isAssetInCooldown(selectedAsset.id) ? (
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 py-4 rounded-2xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 cursor-not-allowed opacity-60">
+                                <Check size={24} /> Verified
+                                <div className="text-sm font-normal ml-2 text-slate-600 dark:text-slate-400">
+                                    Available: {nextVerifyTime}
+                                </div>
+                            </div>
+                        ) : (
+                            <button onClick={handleVerify} className="w-full bg-indigo-600 active:bg-indigo-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30 flex items-center justify-center gap-2 transform active:scale-95 transition-all hover:bg-indigo-700">
+                                <Check size={24} /> Mark as Verified
+                            </button>
+                        )}
                         <button onClick={() => setView('COMPLAINT')} className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-200 py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                             Report Issue
                         </button>

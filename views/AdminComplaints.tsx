@@ -1,14 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Clock, Search, ChevronLeft, ChevronRight, X, Download, ChevronDown, FileSpreadsheet, FileText, Calendar } from 'lucide-react';
-import { Complaint } from '../types';
-import { fetchComplaints, exportComplaints } from '../services/dashboardService';
+import { Complaint, User } from '../types';
+import { fetchComplaints, exportComplaints, fetchUsers } from '../services/dashboardService';
+import { CustomSelect } from '../components/CustomSelect';
+import { useApp } from '../context/AppContext';
+import toast from 'react-hot-toast';
 
 export const AdminComplaints = () => {
+    const { navigate } = useApp();
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [resolvingId, setResolvingId] = useState<string | null>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
@@ -17,6 +20,7 @@ export const AdminComplaints = () => {
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Resolved'>('All');
+    const [selectedCategory, setSelectedCategory] = useState('All');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
@@ -25,16 +29,42 @@ export const AdminComplaints = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [totalRecords, setTotalRecords] = useState(0);
     const [limit] = useState(5);
+    const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
+    const [searchDebounceTimer, setSearchDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+
+    // Extract unique categories from complaints when they load
+    useEffect(() => {
+        if (complaints.length > 0) {
+            const uniqueCategories = [...new Set(complaints.map(c => c.assetCategory).filter(Boolean))].sort() as string[];
+            const options = [{ value: 'All', label: 'Category: All' }];
+            uniqueCategories.forEach(category => {
+                options.push({ value: category, label: category });
+            });
+            setCategoryOptions(options);
+        }
+    }, [complaints]);
 
     const loadComplaints = async () => {
         setLoading(true);
         setError(null);
         try {
+            // Convert date strings to ISO format
+            let startDateISO: string | undefined;
+            let endDateISO: string | undefined;
+            
+            if (startDate) {
+                startDateISO = new Date(startDate).toISOString().split('T')[0] + 'T00:00:00Z';
+            }
+            if (endDate) {
+                endDateISO = new Date(endDate).toISOString().split('T')[0] + 'T23:59:59Z';
+            }
+            
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
-                startDate: startDate || undefined,
-                endDate: endDate || undefined,
+                category: selectedCategory !== 'All' ? selectedCategory : undefined,
+                startDate: startDateISO,
+                endDate: endDateISO,
                 page: currentPage,
                 limit: limit,
             };
@@ -65,41 +95,45 @@ export const AdminComplaints = () => {
         }
     };
 
+    // Debounced search effect
     useEffect(() => {
+        // Clear existing timer
+        if (searchDebounceTimer) {
+            clearTimeout(searchDebounceTimer);
+        }
+
+        // Set new timer for search
+        const timer = setTimeout(() => {
+            setCurrentPage(1);
+            loadComplaints();
+        }, 500); // 500ms debounce
+
+        setSearchDebounceTimer(timer);
+
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [searchTerm]);
+
+    // Effect for other filters (no debounce needed)
+    useEffect(() => {
+        setCurrentPage(1);
         loadComplaints();
-    }, [searchTerm, statusFilter, startDate, endDate, currentPage]);
+    }, [statusFilter, selectedCategory, startDate, endDate]);
+
+    // Effect for pagination changes
+    useEffect(() => {
+        // Only load when currentPage changes (not on first mount from above effects)
+        if (currentPage > 1 || (currentPage === 1 && complaints.length > 0)) {
+            loadComplaints();
+        }
+    }, [currentPage]);
+
+    const calculatedTotalPages = Math.max(currentPage, totalPages);
 
     const resolveComplaint = async (complaintId: string) => {
-        if (resolvingId) return; // Prevent multiple simultaneous resolves
-
-        setResolvingId(complaintId);
-        try {
-            const token = localStorage.getItem('accessToken');
-            if (!token) {
-                throw new Error('No access token found');
-            }
-
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-            const response = await fetch(`${apiBaseUrl}/admin/complaints/${complaintId}/resolve`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to resolve complaint');
-            }
-
-            // Reload complaints to get updated data
-            await loadComplaints();
-        } catch (err) {
-            console.error('Failed to resolve complaint:', err);
-            // Could show a toast notification here, but for now just log
-        } finally {
-            setResolvingId(null);
-        }
+        // No longer used - navigation to detail page handles this
+        return;
     };
 
     const handleExport = async (format: 'excel' | 'pdf') => {
@@ -107,11 +141,23 @@ export const AdminComplaints = () => {
         setIsExportDropdownOpen(false);
         
         try {
+            // Convert date strings to ISO format
+            let startDateISO: string | undefined;
+            let endDateISO: string | undefined;
+            
+            if (startDate) {
+                startDateISO = new Date(startDate).toISOString().split('T')[0] + 'T00:00:00Z';
+            }
+            if (endDate) {
+                endDateISO = new Date(endDate).toISOString().split('T')[0] + 'T23:59:59Z';
+            }
+            
             const params = {
                 search: searchTerm || undefined,
                 status: statusFilter !== 'All' ? statusFilter : undefined,
-                startDate: startDate || undefined,
-                endDate: endDate || undefined,
+                category: selectedCategory !== 'All' ? selectedCategory : undefined,
+                startDate: startDateISO,
+                endDate: endDateISO,
             };
             const exportData = await exportComplaints(params);
             
@@ -149,7 +195,7 @@ export const AdminComplaints = () => {
         
         const worksheetData = data.map((complaint) => ({
             'Asset Name': complaint.assetName || 'N/A',
-            'Asset ID': complaint.assetId || 'N/A',
+            'Category': complaint.assetCategory || 'N/A',
             'Status': complaint.status || 'N/A',
             'Description': complaint.description || 'N/A',
             'Reported By': complaint.reportedBy || 'N/A',
@@ -184,7 +230,7 @@ export const AdminComplaints = () => {
         
         const tableData = data.map((complaint) => [
             complaint.assetName || 'N/A',
-            complaint.assetId || 'N/A',
+            complaint.assetCategory || 'N/A',
             complaint.status || 'N/A',
             complaint.description ? complaint.description.substring(0, 50) + '...' : 'N/A',
             complaint.reportedBy || 'N/A',
@@ -192,7 +238,7 @@ export const AdminComplaints = () => {
         ]);
 
         autoTable(doc, {
-            head: [['Asset Name', 'Asset ID', 'Status', 'Description', 'Reported By', 'Date']],
+            head: [['Asset Name', 'Category', 'Status', 'Description', 'Reported By', 'Date']],
             body: tableData,
             startY: 35,
             styles: { fontSize: 8, cellPadding: 2 },
@@ -213,6 +259,7 @@ export const AdminComplaints = () => {
     const handleClearFilters = () => {
         setSearchTerm('');
         setStatusFilter('All');
+        setSelectedCategory('All');
         setStartDate('');
         setEndDate('');
         setCurrentPage(1);
@@ -235,7 +282,7 @@ export const AdminComplaints = () => {
                     </div>
                     
                     {/* Filter Group */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full md:w-auto min-w-[350px]">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full md:w-auto min-w-[550px]">
                         {/* Status Filter */}
                         <select
                             value={statusFilter}
@@ -249,6 +296,16 @@ export const AdminComplaints = () => {
                             <option value="Pending">Pending</option>
                             <option value="Resolved">Resolved</option>
                         </select>
+
+                        {/* Category Filter */}
+                        <CustomSelect 
+                            value={selectedCategory}
+                            onChange={(value) => {
+                                setSelectedCategory(value);
+                                setCurrentPage(1);
+                            }}
+                            options={categoryOptions}
+                        />
 
                         {/* Date Range Dropdown */}
                         <div className="relative">
@@ -311,92 +368,72 @@ export const AdminComplaints = () => {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 gap-4">
-                        {complaints.length === 0 ? (
+                    {complaints.length === 0 ? (
                         <div className="bg-white dark:bg-slate-800 p-12 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
                             <AlertTriangle className="mx-auto text-slate-300 dark:text-slate-600 mb-4" size={48} />
                             <h3 className="text-lg font-medium text-slate-800 dark:text-white">No Complaints Found</h3>
                             <p className="text-slate-400 dark:text-slate-500">
-                                {complaints.length === 0 ? 'Everything is running smoothly.' : 'Try adjusting your filters.'}
+                                Everything is running smoothly.
                             </p>
                         </div>
                     ) : (
-                        complaints.map(complaint => (
-                            <div key={complaint.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-start justify-between gap-6 transition-colors duration-200">
-                                <div className="flex-1 space-y-3">
-                                    <div className="flex items-center gap-3">
-                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
-                                            complaint.status === 'Pending' || complaint.status === 'PENDING'
-                                                ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                                                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
-                                            }`}>
-                                            {complaint.status}
-                                        </span>
-                                        <span className="text-sm text-slate-400 dark:text-slate-500">{new Date(complaint.date || complaint.timestamp || '').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) + ', ' + new Date(complaint.date || complaint.timestamp || '').toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase()}</span>
-                                    </div>
-                                    <h3 className="text-2xl font-bold text-slate-800 dark:text-white">
-                                        {complaint.assetName} <span className="text-slate-400 dark:text-slate-500 font-normal text-base">({complaint.assetId})</span>
-                                    </h3>
-                                    <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-                                        {complaint.description}
-                                    </p>
-                                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 pt-2">
-                                        <span className="font-semibold text-slate-700 dark:text-slate-300">Reported by:</span>
-                                        <span>{complaint.reportedBy}</span>
-                                    </div>
-                                    {complaint.imageUrl && (
-                                        <div className="mt-3">
-                                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Evidence:</p>
-                                            <img 
-                                                src={complaint.imageUrl} 
-                                                alt="Complaint Evidence" 
-                                                className="rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm max-w-xs h-32 object-cover hover:scale-105 transition-transform cursor-pointer"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedImage(complaint.imageUrl!);
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col gap-3 min-w-[140px]">
-                                    {complaint.status === 'Pending' ? (
-                                        <button 
-                                            onClick={() => resolveComplaint(complaint.id)}
-                                            disabled={resolvingId === complaint.id}
-                                            className={`flex items-center justify-center gap-2 py-2.5 px-5 rounded-xl font-semibold shadow-sm transition-colors text-sm ${
-                                                resolvingId === complaint.id
-                                                    ? 'bg-indigo-400 cursor-not-allowed text-white'
-                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                                            }`}
-                                        >
-                                            <CheckCircle size={18} />
-                                            {resolvingId === complaint.id ? 'Resolving...' : 'Resolve'}
-                                        </button>
-                                    ) : (
-                                        <button disabled className="flex items-center justify-center gap-2 bg-indigo-600 text-white py-2.5 px-5 rounded-xl font-semibold shadow-sm text-sm cursor-not-allowed opacity-75">
-                                            <CheckCircle size={18} /> Resolved
-                                        </button>
-                                    )}
-                                    <button className="flex items-center justify-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 py-2.5 px-5 rounded-xl font-semibold transition-colors text-sm">
-                                        View Details
-                                    </button>
-                                </div>
+                        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden transition-colors duration-200">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ASSET NAME</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">CATEGORY</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">STATUS</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">DATE</th>
+                                            <th className="px-6 py-4 text-left font-semibold text-slate-700 dark:text-slate-300">ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                        {complaints.map(complaint => (
+                                            <tr key={complaint.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                                <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">
+                                                    {complaint.assetName}
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                                                    {complaint.assetCategory}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider inline-block ${
+                                                        complaint.status === 'Pending' || complaint.status === 'PENDING'
+                                                            ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                                                            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
+                                                        }`}>
+                                                        {complaint.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                                    {new Date(complaint.date || complaint.timestamp || '').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <button 
+                                                        onClick={() => navigate('/complaint', { complaintId: complaint.id, complaintData: complaint })}
+                                                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold transition-colors">
+                                                        View Details
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        ))
+                        </div>
                     )}
-                </div>
 
                 {/* Pagination and Export */}
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm transition-colors duration-200">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4">
                         {/* Export Button - Bottom Left */}
                         <div className="relative">
                             <button
                                 onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
                                 disabled={isExporting || complaints.length === 0}
-                                className={`flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all ${
+                                className={`flex items-center gap-2 bg-indigo-900 text-blue-100 px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-900/30 dark:shadow-none hover:bg-indigo-950 transition-all ${
                                     isExporting || complaints.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                                 }`}
                             >
@@ -426,65 +463,69 @@ export const AdminComplaints = () => {
                             {isExportDropdownOpen && !isExporting && complaints.length > 0 && <div className="fixed inset-0 z-10" onClick={() => setIsExportDropdownOpen(false)}></div>}
                         </div>
 
-                        {/* Pagination Info - Centered */}
-                        <div className="text-sm text-slate-600 dark:text-slate-400">
-                            {totalPages > 1 ? (
-                                <>Showing page {currentPage} of {totalPages} ({totalRecords} total complaints)</>
-                            ) : (
-                                <>{totalRecords} total complaint{totalRecords !== 1 ? 's' : ''}</>
+                        {/* Spacer */}
+                        <div className="flex-1"></div>
+
+                        {/* Right Section - Pagination Info and Buttons */}
+                        <div className="flex items-center gap-4">
+                            {/* Pagination Info */}
+                            <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                {complaints.length > 0 ? (
+                                    <>Page {currentPage} of {Math.max(1, calculatedTotalPages)}</>
+                                ) : (
+                                    <>No data</>
+                                )}
+                            </div>
+
+                            {/* Pagination Buttons */}
+                            {calculatedTotalPages > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                    >
+                                        <ChevronLeft size={16} />
+                                        Previous
+                                    </button>
+                                    <div className="flex items-center gap-1">
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                            let pageNum;
+                                            if (totalPages <= 5) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage <= 3) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage >= totalPages - 2) {
+                                                pageNum = totalPages - 4 + i;
+                                            } else {
+                                                pageNum = currentPage - 2 + i;
+                                            }
+                                            return (
+                                                <button
+                                                    key={pageNum}
+                                                    onClick={() => handlePageChange(pageNum)}
+                                                    className={`px-3 py-2 rounded-xl transition-colors ${
+                                                        currentPage === pageNum
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                                    }`}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <button
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === calculatedTotalPages}
+                                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                    >
+                                        Next
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
                             )}
                         </div>
-
-                        {/* Pagination Buttons */}
-                        {totalPages > 1 ? (
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                                >
-                                    <ChevronLeft size={16} />
-                                    Previous
-                                </button>
-                                <div className="flex items-center gap-1">
-                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                        let pageNum;
-                                        if (totalPages <= 5) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage <= 3) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage >= totalPages - 2) {
-                                            pageNum = totalPages - 4 + i;
-                                        } else {
-                                            pageNum = currentPage - 2 + i;
-                                        }
-                                        return (
-                                            <button
-                                                key={pageNum}
-                                                onClick={() => handlePageChange(pageNum)}
-                                                className={`px-3 py-2 rounded-xl transition-colors ${
-                                                    currentPage === pageNum
-                                                        ? 'bg-indigo-600 text-white'
-                                                        : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                                }`}
-                                            >
-                                                {pageNum}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                                >
-                                    Next
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="w-[200px]"></div>
-                        )}
                     </div>
                 </div>
             </>
@@ -512,6 +553,8 @@ export const AdminComplaints = () => {
                     </div>
                 </div>
             )}
+
         </div>
     );
 };
+

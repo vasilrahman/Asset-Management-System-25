@@ -148,7 +148,7 @@ export const exportVerifications = async (params?: ExportVerificationsParams): P
 export interface FetchComplaintsParams {
   search?: string;
   status?: string;
-  reportedBy?: string;
+  category?: string;
   startDate?: string;
   endDate?: string;
   page?: number;
@@ -174,7 +174,7 @@ export const fetchComplaints = async (params?: FetchComplaintsParams): Promise<C
   const queryParams = new URLSearchParams();
   if (params?.search) queryParams.append('search', params.search);
   if (params?.status && params.status !== 'All') queryParams.append('status', params.status.toUpperCase());
-  if (params?.reportedBy && params.reportedBy !== 'All') queryParams.append('reportedBy', params.reportedBy);
+  if (params?.category && params.category !== 'All') queryParams.append('category', params.category.toUpperCase());
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
   if (params?.page) queryParams.append('page', params.page.toString());
@@ -212,7 +212,7 @@ export const fetchComplaints = async (params?: FetchComplaintsParams): Promise<C
 export interface ExportComplaintsParams {
   search?: string;
   status?: string;
-  reportedBy?: string;
+  category?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -232,7 +232,7 @@ export const exportComplaints = async (params?: ExportComplaintsParams): Promise
   const queryParams = new URLSearchParams();
   if (params?.search) queryParams.append('search', params.search);
   if (params?.status && params.status !== 'All') queryParams.append('status', params.status.toUpperCase());
-  if (params?.reportedBy && params.reportedBy !== 'All') queryParams.append('reportedBy', params.reportedBy);
+  if (params?.category && params.category !== 'All') queryParams.append('category', params.category.toUpperCase());
   if (params?.startDate) queryParams.append('startDate', params.startDate);
   if (params?.endDate) queryParams.append('endDate', params.endDate);
 

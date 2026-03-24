@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, X, Calendar, Download, ChevronLeft, ChevronRight, ChevronDown, FileSpreadsheet, FileText, Search, RefreshCw } from 'lucide-react';
-import { VerificationLog } from '../types';
-import { fetchVerifications, exportVerifications } from '../services/dashboardService';
+import { VerificationLog, User } from '../types';
+import { fetchVerifications, exportVerifications, fetchUsers } from '../services/dashboardService';
 import { CustomSelect } from '../components/CustomSelect';
 
 export const AdminVerified = () => {
@@ -17,7 +17,7 @@ export const AdminVerified = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedStatus, setSelectedStatus] = useState('All');
+  const [selectedVerifiedBy, setSelectedVerifiedBy] = useState('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -26,6 +26,26 @@ export const AdminVerified = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [limit] = useState(5);
+  const [staffOptions, setStaffOptions] = useState<{ value: string; label: string }[]>([]);
+
+  // Fetch staff users on component mount
+  useEffect(() => {
+    const loadStaffUsers = async () => {
+      try {
+        const users = await fetchUsers();
+        const staffUsers = users.filter(user => user.role === 'STAFF');
+        const options = [{ value: 'All', label: 'Verified By: All' }];
+        staffUsers.forEach(user => {
+          options.push({ value: user.fullName, label: user.fullName });
+        });
+        setStaffOptions(options);
+      } catch (err) {
+        console.error('Failed to fetch staff users:', err);
+        setStaffOptions([{ value: 'All', label: 'Verified By: All' }]);
+      }
+    };
+    loadStaffUsers();
+  }, []);
 
   // Debounce search
   useEffect(() => {
@@ -43,7 +63,7 @@ export const AdminVerified = () => {
       const params = {
         search: debouncedSearch || undefined,
         category: selectedCategory !== 'All' ? selectedCategory : undefined,
-        status: selectedStatus !== 'All' ? selectedStatus : undefined,
+        verifiedBy: selectedVerifiedBy !== 'All' ? selectedVerifiedBy : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         page: currentPage,
@@ -85,7 +105,7 @@ export const AdminVerified = () => {
       const params = {
         search: debouncedSearch || undefined,
         category: selectedCategory !== 'All' ? selectedCategory : undefined,
-        status: selectedStatus !== 'All' ? selectedStatus : undefined,
+        verifiedBy: selectedVerifiedBy !== 'All' ? selectedVerifiedBy : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       };
@@ -190,13 +210,15 @@ export const AdminVerified = () => {
 
   useEffect(() => {
     loadVerifications();
-  }, [debouncedSearch, selectedCategory, selectedStatus, startDate, endDate, currentPage]);
+  }, [debouncedSearch, selectedCategory, selectedVerifiedBy, startDate, endDate, currentPage]);
+
+  const calculatedTotalPages = Math.max(currentPage, totalPages);
 
   const handleClearFilters = () => {
     setSearchTerm('');
     setDebouncedSearch('');
     setSelectedCategory('All');
-    setSelectedStatus('All');
+    setSelectedVerifiedBy('All');
     setStartDate('');
     setEndDate('');
     setCurrentPage(1);
@@ -207,7 +229,7 @@ export const AdminVerified = () => {
   };
 
   const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
+    if (newPage >= 1 && newPage <= calculatedTotalPages) {
       setCurrentPage(newPage);
     }
   };
@@ -219,14 +241,6 @@ export const AdminVerified = () => {
     { value: 'Mobile', label: 'Mobile' },
     { value: 'Tablet', label: 'Tablet' },
     { value: 'Other', label: 'Other' },
-  ];
-
-  const statusOptions = [
-    { value: 'All', label: 'Status: All' },
-    { value: 'Active', label: 'Active' },
-    { value: 'Maintenance', label: 'Maintenance' },
-    { value: 'Retired', label: 'Retired' },
-    { value: 'Lost', label: 'Lost' },
   ];
 
   return (
@@ -253,9 +267,9 @@ export const AdminVerified = () => {
                     options={categoryOptions} 
                 />
                 <CustomSelect 
-                    value={selectedStatus} 
-                    onChange={setSelectedStatus} 
-                    options={statusOptions} 
+                    value={selectedVerifiedBy} 
+                    onChange={setSelectedVerifiedBy} 
+                    options={staffOptions} 
                 />
 
                 {/* Date Range Dropdown */}
@@ -365,7 +379,7 @@ export const AdminVerified = () => {
                  <button
                    onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
                    disabled={exporting || logs.length === 0}
-                   className={`flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 transition-all ${
+                   className={`flex items-center gap-2 bg-indigo-900 text-blue-100 px-6 py-3 rounded-xl text-sm font-medium shadow-lg shadow-indigo-900/30 dark:shadow-none hover:bg-indigo-950 transition-all ${
                      exporting || logs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                    }`}
                  >
@@ -397,15 +411,15 @@ export const AdminVerified = () => {
 
                {/* Pagination Info - Centered */}
                <div className="text-sm text-slate-600 dark:text-slate-400">
-                 {totalPages > 1 ? (
-                   <>Showing page {currentPage} of {totalPages} ({totalRecords} total records)</>
+                 {calculatedTotalPages > 1 ? (
+                   <>Showing page {currentPage} of {calculatedTotalPages} ({totalRecords} total records)</>
                  ) : (
                    <>{totalRecords} total record{totalRecords !== 1 ? 's' : ''}</>
                  )}
                </div>
 
                {/* Pagination Buttons */}
-               {totalPages > 1 ? (
+               {calculatedTotalPages > 1 ? (
                  <div className="flex items-center gap-2">
                    <button
                      onClick={() => handlePageChange(currentPage - 1)}
@@ -416,14 +430,14 @@ export const AdminVerified = () => {
                      Previous
                    </button>
                    <div className="flex items-center gap-1">
-                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                     {Array.from({ length: Math.min(5, calculatedTotalPages) }, (_, i) => {
                        let pageNum;
-                       if (totalPages <= 5) {
+                       if (calculatedTotalPages <= 5) {
                          pageNum = i + 1;
                        } else if (currentPage <= 3) {
                          pageNum = i + 1;
-                       } else if (currentPage >= totalPages - 2) {
-                         pageNum = totalPages - 4 + i;
+                       } else if (currentPage >= calculatedTotalPages - 2) {
+                         pageNum = calculatedTotalPages - 4 + i;
                        } else {
                          pageNum = currentPage - 2 + i;
                        }
@@ -444,7 +458,7 @@ export const AdminVerified = () => {
                    </div>
                    <button
                      onClick={() => handlePageChange(currentPage + 1)}
-                     disabled={currentPage === totalPages}
+                     disabled={currentPage === calculatedTotalPages}
                      className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                    >
                      Next
