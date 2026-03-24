@@ -14,6 +14,7 @@ import { StaffModule } from './views/StaffModule';
 import { AdminGenerateQR } from './views/AdminGenerateQR';
 import { AdminVerified } from './views/AdminVerified';
 import { AdminComplaints } from './views/AdminComplaints';
+import { AdminComplaintDetail } from './views/AdminComplaintDetail';
 
 import { LayoutDashboard, Package, Users, LogOut, Menu, X, Bell, AlertTriangle, User, Moon, Sun, ChevronDown, QrCode, CheckCircle, MessageSquare } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -128,6 +129,7 @@ const MainLayout = () => {
             case '/generate-qr': return <AdminGenerateQR />;
             case '/verified': return <AdminVerified />;
             case '/complaints': return <AdminComplaints />;
+            case '/complaint': return <AdminComplaintDetail />;
             default: return <AdminDashboard />;
         }
     };
